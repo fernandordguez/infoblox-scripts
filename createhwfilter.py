@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# This script receives as input a CSV file with at least a column named "mac_address" with a list of valid MAC addresses. It will then create an IPv4 Harware Filter with all those MACs
+# This script receives as input a CSV file with at least a column named "mac_address" with a list of valid MAC addresses. It will then create an IPv4 Harware Filter with those MACs
 
 import csv
 import bloxone
@@ -13,7 +13,7 @@ list_macs = []
 
 def get_args():
     # Parse arguments
-    usage = ' -c b1config.ini -d nios_csv_data.csv [ --delimiter x ] [ --yaml <yaml file> ] [ --help ]'
+    usage = ' -c b1config.ini -d nios_csv_data.csv [ --delimiter x ] [ --help ]'
 
     description = 'This is a NIOS CSV to Infoblox BloxOne DDI migration tool'
 
@@ -26,19 +26,13 @@ def get_args():
         api_key = 'API_KEY'
         
     # INPUT
-    The script takes as input a CSV file in Infoblox CSV format. The intention is
-    for this to be a CSV export file from NIOS, but it could also be generated from
-    other sources.
+    This script receives as input a CSV file with at least a column named "mac_address"
+    with a list of valid MAC addresses. It will then create an IPv4 Harware Filter with
+    with those MACs
     
     # OUTPUT
 
-    Besides logging actions to standard out, the script outputs the following files:
-
-    - nios2b1ddi-import-YYYYMMDDhhmmss.log : records all of the text output by the script.
-
-    - nios2b1ddi-import-YYYYMMDDhhmmss-error.csv : contains the lines from the CSV input file
-      that failed to import. The first column includes the error message. This is similar
-      to the errors files from NIOS CSV Import.
+    Logging actions to standard out:
      '''
 
     par = argparse.ArgumentParser(formatter_class=RawDescriptionHelpFormatter,
@@ -56,8 +50,6 @@ def get_args():
     # Optional Arguments(s)
     optional = par.add_argument_group('Optional Arguments')
     opt_grp = optional.add_argument
-    opt_grp('--hr', action="store_true", dest="hostaddr_to_reserved",
-            help="Add reservations for host addresses defined within DHCP Ranges", required=False)
     opt_grp('--delimiter', action="store", dest="csvdelimiter", help="Delimiter used in CSV data file", required=False)
     opt_grp('--yaml', action="store", help="Alternate yaml file for supported objects", default='objects.yaml')
     opt_grp('--debug', action='store_true', help=argparse.SUPPRESS, dest='debug', required=False)
