@@ -14,39 +14,26 @@ list_macs = []
 def get_args():
     # Parse arguments
     usage = ' -c b1config.ini -d nios_csv_data.csv [ --delimiter x ] [ --help ]'
-
     description = 'This is a NIOS CSV to Infoblox BloxOne DDI migration tool'
-
     epilog = '''
     sample b1config.ini
-    
-        [BloxOne]
+    [BloxOne]
         url = 'https://csp.infoblox.com'
         api_version = 'v1'
-        api_key = 'API_KEY'
-        
+        api_key = 'API_KEY'   
     # INPUT
     This script receives as input a CSV file with at least a column named "mac_address"
     with a list of valid MAC addresses. It will then create an IPv4 Harware Filter with
     with those MACs
-    
     # OUTPUT
-
     Logging actions to standard out:
-     '''
-
-    par = argparse.ArgumentParser(formatter_class=RawDescriptionHelpFormatter,
-                                  description=description,
-                                  add_help=False,
-                                  usage='%(prog)s' + usage,
-                                  epilog=epilog)
-
+    '''
+    par = argparse.ArgumentParser(formatter_class=RawDescriptionHelpFormatter,description=description,add_help=False,usage='%(prog)s' + usage,epilog=epilog)
     # Required Argument(s)
     required = par.add_argument_group('Required Arguments')
     req_grp = required.add_argument
     req_grp('-c', '--config', action="store", dest="config", help="Path to ini file with API key", required=True)
     req_grp('-d', '--csvfile', action="store", dest="csvfilename", help="Path to CSV data file", required=True)
-
     # Optional Arguments(s)
     optional = par.add_argument_group('Optional Arguments')
     opt_grp = optional.add_argument
@@ -54,7 +41,6 @@ def get_args():
     opt_grp('--yaml', action="store", help="Alternate yaml file for supported objects", default='objects.yaml')
     opt_grp('--debug', action='store_true', help=argparse.SUPPRESS, dest='debug', required=False)
     opt_grp('-h', '--help', action='help', help='show this help message and exit')
-
     return par.parse_args(args=None if sys.argv[1:] else ['-h'])
 
 def get_error(error_response):
