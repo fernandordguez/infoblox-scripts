@@ -127,3 +127,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+Compare DHCP leases nios vs b1ddi/DHCPleases2b1ddi.py
+compDHCPLeases/.DS_Store
+compDHCPLeases/alldataexport.csv
