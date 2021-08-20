@@ -89,9 +89,3 @@ b1ddi = bloxone.b1ddi(cfg_file= args.config)
 initialize_logger(args.debug)
 nameHwFilter = input('Please enter name for the Hardware Filter\n')
 createsHwFilter (nameHwFilter, args.csvfilename, b1ddi)
-
-
-
-
-
-
