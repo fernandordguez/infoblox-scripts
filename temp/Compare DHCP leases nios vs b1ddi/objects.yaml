@@ -1,0 +1,224 @@
+# Field Mappings/Supported Objects
+version: 0.3.6
+# Last updated: 20210714
+# Author: Michael Smith, Brian Alaimo
+networkcontainer:
+  required:
+    - network_view
+    - address
+    - netmask
+  optional:
+    comment: comment
+    lease_time: lease_time
+network:
+  required:
+    - network_view
+    - address
+    - netmask
+    - dhcp_members
+  optional:
+    comment: comment
+    lease_time: lease_time
+dhcprange:
+  required:
+    - start_address
+    - end_address
+    - network_view
+    - server_association_type
+    - member
+    - failover_association
+  optional:
+    comment: comment
+    exclusion_ranges: exclusion_ranges
+    name: name
+reservedrange:
+  required:
+    - start_address
+    - end_address
+    - network_view
+  optional:
+    comment: comment
+    name: name
+fixedaddress:
+  required:
+    - ip_address
+    - network_view
+    - match_option
+  optional:
+    comment: comment
+    name: name
+authzone:
+  required:
+    - fqdn
+    - view
+    - ns_group
+  optional:
+    comment: comment
+    disabled: disabled
+    soa_serial_number: initial_soa_serial
+    soa_default_ttl: default_ttl
+    soa_email: rname
+    soa_expire: expire
+    soa_negative_ttl: negative_ttl
+    soa_refresh: refresh
+    soa_retry: retry
+    prefix: prefix
+delegatedzone:
+  required:
+    - fqdn
+    - view
+    - delegate_to
+  optional:
+    delegated_ttl: ttl
+    disabled: disabled
+    comment: comment
+    prefix: prefix
+forwardzone:
+  required:
+    - fqdn
+    - view
+    - ns_group
+    - ns_group_external
+    - forward_to
+    - forwarding_servers
+  optional:
+    forwarders_only: forward_only
+    disabled: disabled
+    comment: comment
+    prefix: prefix
+hostrecord:
+  required:
+    - fqdn
+    - addresses
+    - ipv6_addresses
+    - configure_for_dns
+    - aliases
+    - network_view
+  optional:
+    ttl: ttl
+    comment: comment
+    disabled: disabled
+    configure_for_dns: configure_for_dns
+hostaddress:
+  required:
+    - parent
+    - address
+    - mac_address
+    - configure_for_dhcp
+    - network_view
+  optional:
+    '...':
+arecord:
+  required:
+    - view
+    - fqdn
+    - address
+  optional:
+    ttl: ttl
+    comment: comment
+    disabled: disabled
+aaaarecord:
+  required:
+    - view
+    - fqdn
+    - address
+  optional:
+    ttl: ttl
+    comment: comment
+    disabled: disabled
+caarecord:
+  required:
+    - view
+    - fqdn
+    - ca_flag
+    - ca_tag
+    - ca_value
+  optional:
+    ttl: ttl
+    comment: comment
+    disabled: disabled
+cnamerecord:
+  required:
+    - view
+    - fqdn
+    - canonical_name
+  optional:
+    ttl: ttl
+    comment: comment
+    disabled: disabled
+mxrecord:
+  required:
+    - view
+    - fqdn
+    - mx
+    - priority
+  optional:
+    ttl: ttl
+    comment: comment
+    disabled: disabled
+naptrrecord:
+  required:
+    - view
+    - fqdn
+    - flags
+    - order
+    - preference
+    - services
+    - replacement
+    - regexp
+  optional:
+    ttl: ttl
+    comment: comment
+    disabled: disabled
+ptrrecord:
+  required:
+    - view
+    - fqdn
+    - address
+    - dname
+  optional:
+    ttl: ttl
+    comment: comment
+    disabled: disabled
+srvrecord:
+  required:
+    - view
+    - fqdn
+    - port
+    - priority
+    - target
+    - weight
+  optional:
+    ttl: ttl
+    comment: comment
+    disabled: disabled
+txtrecord:
+  required:
+    - view
+    - fqdn
+    - text
+  optional:
+    ttl: ttl
+    comment: comment
+    disabled: disabled
+namedacl:
+  required:
+    - name
+  optional:
+    comment: comment
+namedaclitem:
+  required:
+    - parent
+    - address
+    - tsig_key
+    - defined_acl
+  optional:
+nsgroup:
+  required:
+    - group_name
+    - grid_primaries
+    - grid_secondaries
+    - external_primaries
+    - external_secondaries
+  optional:
+    - comment
