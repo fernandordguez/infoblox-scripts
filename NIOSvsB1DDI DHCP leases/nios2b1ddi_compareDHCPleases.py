@@ -1,15 +1,10 @@
 #!/usr/bin/python3
-# run as: python3 nios2b1ddi-.py -c b1config.ini -d Alldata.csv
+# run as: python3 nios2b1ddi_compareDHCPleases
 
-import logging
 import bloxonedhcpleases
 from bloxonedhcpleases.rest import ApiException
 import json
-import time
-import os
-import pandas as pd
-from pprint import isrecursive, pprint
-import csv
+#import os
 import requests
 import getpass
 
@@ -86,9 +81,9 @@ def compareLeasesNIOS_B1DDI(CSPleases, NIOSleases):
                     continue                                                     
     return countDHCPleases#
 
-
-def AUTH(apiKey):
+def AUTH(configfile):
     # Configure API key authorization: ApiKeyAuth and initialize some variables
+    b1ddi = bloxone.b1ddi(cfg_file=configfile)
     configuration = bloxonedhcpleases.Configuration()
     configuration.api_key_prefix ['Authorization'] = 'token'
     configuration.api_key['Authorization'] = apiKey
