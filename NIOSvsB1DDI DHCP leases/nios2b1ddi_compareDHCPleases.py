@@ -7,6 +7,7 @@ import json
 #import os
 import requests
 import getpass
+import bloxone
 
 requests.packages.urllib3.disable_warnings()
 
@@ -35,21 +36,19 @@ def getNIOSleases(gm_ip, auth_usr, auth_pwd, limit):    #DHCP leases from NIOS W
         all_leases += leases['result']
     return all_leases
 
-def getSpaceNamesbySpaceId (headers):
+def getSpaceNamesbyIPSpaceID (headers):
     spaceNames = {}
     url = "https://csp.infoblox.com/api/ddi/v1//ipam/ip_space?_fields=id,name"
     response = requests.request("GET", url, headers=headers)
     spaces = json.loads(response.content)['results']
     for i in spaces:
-        #tempDict[i['id']] = i['name']
-        #spaceNames[i['id']] = tempDict
         spaceNames[i['id']] = i['name']
     return spaceNames
 
 def compareLeasesNIOS_B1DDI(CSPleases, NIOSleases):
     # At this point, we have the DHCP leases from the NIOS CSV export
     # and the leases from BloxOne collected through the API
-    spaces = getSpaceNamesbySpaceId(headers)
+    spaces = getSpaceNamesbyIPSpaceID(headers)
     cidr = ''
     tempLease = {}   
     countDHCPleases = {}
@@ -71,9 +70,6 @@ def compareLeasesNIOS_B1DDI(CSPleases, NIOSleases):
                         tempLease['macAddress'] = ipCSP.hardware
                         tempLease['hostId'] = ipCSP.host
                         tempLease['hostname'] = ipCSP.hostname
-                        #tempLease['starts'] = ipCSP.starts
-                        #tempLease['ends'] = ipCSP.ends
-                        #tempLease['options'] = ipCSP.options
                         tempLease['state'] = ipCSP.state
                         countDHCPleases[ipNIOS['network']]['counter'] +=1
                         tempLease['countLeases'] = countDHCPleases[ipNIOS['network']]['counter']
@@ -81,16 +77,15 @@ def compareLeasesNIOS_B1DDI(CSPleases, NIOSleases):
                     continue                                                     
     return countDHCPleases#
 
-def AUTH(configfile):
+def AUTH(apiKey):
     # Configure API key authorization: ApiKeyAuth and initialize some variables
-    b1ddi = bloxone.b1ddi(cfg_file=configfile)
     configuration = bloxonedhcpleases.Configuration()
     configuration.api_key_prefix ['Authorization'] = 'token'
     configuration.api_key['Authorization'] = apiKey
     api_instance = bloxonedhcpleases.LeaseApi(bloxonedhcpleases.ApiClient(configuration))
     return api_instance
 
-def startProcess():
+def main():
     apiKey = input('Please type your API Key to access CSP \n')
     gm_ip = input('Please type the IP address of the Grid Master \n')
     auth_usr = input('Please enter NIOS admin account \n')
@@ -101,14 +96,18 @@ def startProcess():
     NIOSlimit = 10000
     try:
         CSPleases = getCSPleases (api_instance, CSPlimit)                                      # All leases in CSP have been collected via B1DDI API interface
+        print('Completed collection of the leases from BloOne DDI')
     except ApiException as e:
         print("Exception when calling LeaseApi->lease_list: %s\n" % e) 
     NIOSleases = getNIOSleases(gm_ip, auth_usr, auth_pwd, NIOSlimit)                            #Collect NIOS leases from NIOS WAPI
+    print('Collected the leases from NIOS (WAPI)')
+
     countDHCPleases = compareLeasesNIOS_B1DDI( CSPleases, NIOSleases)                           #Compares CSP leases vs NIOS leases --> Identify those networks without leases after the go live
+    print('Completed comparative analsysis NIOS vs B1DDI')
+
     for l in countDHCPleases.keys():                                                            #Prints networks and their active leases 
         print('Network :',l.ljust(20),'Lease Count :',countDHCPleases[l]['counter'])
 
-startProcess()
 
 if __name__ == "__main__":
     # execute only if run as a script
