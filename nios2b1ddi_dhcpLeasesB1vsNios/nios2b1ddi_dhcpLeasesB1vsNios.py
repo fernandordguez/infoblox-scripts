@@ -100,8 +100,13 @@ from google.oauth2.service_account import Credentials
 from csv import reader,writer
 import csv
 import threading
+from threading import BoundedSemaphore
+import urllib3
+import concurrent.futures
+import urllib.request
 
-requests.packages.urllib3.disable_warnings()
+#requests.packages.urllib3.disable_warnings()
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def validate_ip(ip):                                                                                    ## It is used to confirm that the leases are valid IP addresses
     try:
@@ -165,7 +170,7 @@ def getSubnets(B1Token):                                                        
     listSubn = response['results']
     for l in range(len(listSubn)):
         subnet = listSubn[l]['address'] + '/' + str(listSubn[l]['cidr'])
-        netview = {'network_view': spaceNames[listSubn[l]['space']]}
+        netview = {'network_view': spaceNames[listSubn[l]['space']], 'leasesBloxOne': 0, 'leasesNIOS': 0}
         #if subnet in listSubnetsCSP.keys():
         listSubnetsCSP[subnet] = netview
     return listSubnetsCSP                                                                       #Output is a dictonary with the networks as indexes. This objects will be the basis for the comparson between NIOS and BloxOne DHCP leases.
@@ -277,57 +282,118 @@ def comparesLeasesNIOS_BloxOne(B1leases, listSubnets, NIOSleases):              
     return listSubnets
 
 def countBloxOneLeases(listparams, dictSubnets):                                       ## Receives NIOS leases as input (obtained via WAPI from the GM)                                                                                                    ## It also receives a list of the Subnets/Networks to use it as basis for the classification 
-    lease = listparams[0]
-    subnet = listparams[1]
-    dictB1leases = listparams[2]
-    dictSubnets = listparams[3]
-    keysSubnets = listparams[4]
-    if (IPv4Address(lease) in IPv4Network(subnet)):                                             ## With the ipaddress library, we can validate that the IP address of the leases belongs to a network
-        if (subnet in keysSubnets) and (dictB1leases != {}):
-            if dictSubnets['network_view'] == dictB1leases['network_view']:
-                if ('leasesBloxOne' in dictSubnets):
-                    counterBloxOne = dictSubnets['leasesBloxOne']+1
-                else:
-                    counterBloxOne = 1
-                dictSubnets.update({'leasesBloxOne': counterBloxOne})
-    return dictSubnets                                                                   ## If both conditions are met, the counter for that network is increased    --> BloxOne leases
+    #lease = listparams[0]
+    #subnet = listparams[1]
+    #dictB1leases = listparams[2]
+    #dictSubnets = listparams[3]
+    #keysSubnets = listparams[4]
+    if (IPv4Address(listparams[0]) in IPv4Network(listparams[1])):                                             ## With the ipaddress library, we can validate that the IP address of the leases belongs to a network
+        if (listparams[1] in listparams[4]) and (listparams[2] != {}):
+            if listparams[3]['network_view'] == listparams[2]['network_view']:
+                listparams[3].update({'leasesBloxOne': listparams[3]['leasesBloxOne']+1})
+    return listparams[3]                                                                   ## If both conditions are met, the counter for that network is increased    --> BloxOne leases
                                                                                                 ## If both conditions are met, the counter for that network is increased    ---> NIOS leases '''
-               
 
-def countsNIOS(listparams,dictSubnets):                                       ## Receives NIOS leases as input (obtained via WAPI from the GM)                                                                                               ## It also receives a list of the Subnets/Networks to use it as basis for the classification 
-    lease = listparams[0]
-    subnet = listparams[1]
-    dictNIOSleases = listparams[2]
-    dictSubnets = listparams[3]
-    if (IPv4Address(lease) in IPv4Network(subnet)):
-        if dictSubnets['network_view'] == dictNIOSleases['network_view']:
-            if ('leasesNIOS' in dictSubnets):
-                counterNIOS = dictSubnets['leasesNIOS']+1
-            else:
-                counterNIOS = 1
-            dictSubnets.update({'leasesNIOS': counterNIOS})
+def countsNIOS(listparams, dictSubnets):                                       ## Receives NIOS leases as input (obtained via WAPI from the GM)                                                                                               ## It also receives a list of the Subnets/Networks to use it as basis for the classification 
+    #lease = listparams[0]
+    #subnet = listparams[1]
+    #dictNIOSleases = listparams[2]
+    if (IPv4Address(listparams[0]) in IPv4Network(listparams[1])):
+        if listparams[3]['network_view'] == listparams[2]['network_view']:
+            #counterNIOS = 
+            listparams[3].update({'leasesNIOS': listparams[3]['leasesNIOS']+1})
+            dictSubnets = listparams[3]
     return dictSubnets
                                                                                 ## If both conditions are met, the counter for that network is increased    ---> NIOS leases '''
 
-            
+def processB1Leases_old(listSubnets,B1leases):
+    threads = list()
+    dictSubnets = {}
+    
+    listparams = []
+    for subnet in listSubnets:
+        for lease in B1leases:
+            dictSubnets = listSubnets[subnet]
+            dictB1leases = B1leases[lease]
+            keySubnets = list(listSubnets.keys())
+            listparams = [lease, subnet, dictB1leases, dictSubnets, keySubnets]
+            t = threading.Thread(target=countBloxOneLeases, args=(listparams, listSubnets[subnet]))
+            listSubnets[subnet] = dictSubnets
+            t.name = subnet
+            t.start()
+            print(t.name)
+            threads.append(t)
+    for t in threads:
+        t.join()
+    return listSubnets
 
-def comparesB1Leases(listSubnets,B1leases,NIOSleases):
+def processB1Leases_old(subnet,listparams):
+    threads = list()
+    dictSubnets = {}
+    
+    for lease in listparams[1]:
+        dictSubnets = listparams[0][subnet]
+        dictB1leases = listparams[1][lease]
+        keySubnets = list(listparams[0].keys())
+        listparams = [lease, subnet, dictB1leases, dictSubnets, keySubnets]
+        t = threading.Thread(target=countBloxOneLeases, args=(listparams, listparams[0][subnet]))
+        listparams[0][subnet] = dictSubnets
+        t.name = subnet
+        t.start()
+        print(t.name)
+        threads.append(t)
+    for t in threads:
+        t.join()
+    return listparams[0]
+
+
+def processB1Leases(listSubnets,B1leases):
+    threads = list()
+    listparams = []
+    for subnet in listSubnets:
+        for lease in B1leases:
+            listparams = [lease, subnet, B1leases[lease], listSubnets[subnet], list(listSubnets.keys())]
+            t = threading.Thread(target=countBloxOneLeases, args=(listparams, listSubnets[subnet]))
+            #t.name = subnet
+            t.start()
+            #print(t.name)
+            threads.append(t)
+    #for t in threads:
+    #    t.join()
+    return listSubnets
+
+listparams = [listSubnets, B1leases]
+with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    future_to_processB1Leases = {executor.submit(processB1Leases,subnet,listparams) : subnet for subnet in listSubnets}
+    for future in concurrent.futures.as_completed(future_to_processB1Leases):
+        subnet = future_to_processB1Leases[future]
+        try:
+            data = future.result()
+        except Exception as exc:
+            print('%r generated an exception: %s' % (subnet, exc))
+        else:
+            print('%r page is %d bytes' % (subnet, len(data)))
+        
+def processNIOSLeases(listSubnets,NIOSleases):
     threads = list()
     dictSubnets = {}
     listparams = []
-    listparams2 = []
     for subnet in listSubnets:
-        for b1l in B1leases:
+        for lease in NIOSleases:
             dictSubnets = listSubnets[subnet]
-            dictB1leases = B1leases[b1l]
-            keySubnets = list(listSubnets.keys())
-            listparams = [b1l, subnet, dictB1leases, dictSubnets, keySubnets]
-            t = threading.Thread(target=countBloxOneLeases, args=(listparams, dictSubnets))
+            dictNIOSleases = NIOSleases[lease]
+            listparams = [lease,subnet,NIOSleases[lease],dictNIOSleases]
+            t = threading.Thread(target=countsNIOS, args=(listparams, dictSubnets))
             listSubnets[subnet] = dictSubnets
             t.name = subnet
             t.start()
             threads.append(t)
-        for niosl in NIOSleases:
+            #Separatator
+    for t in threads:
+        t.join()
+    return listSubnets
+
+        ''' for niosl in NIOSleases:
             dictSubnets = listSubnets[subnet]
             dictNIOSleases = NIOSleases[niosl]
             listparams2 = [niosl,subnet,NIOSleases[niosl],dictNIOSleases]
@@ -336,7 +402,7 @@ def comparesB1Leases(listSubnets,B1leases,NIOSleases):
             t.name = subnet
             t.start()
             threads.append(t)
-            #Separatator
+            #Separatator '''
     for t in threads:
         t.join()
     return listSubnets
@@ -436,6 +502,7 @@ def get_args():                                                                 
 ##########################################################
 
 def main():
+    threadLimiter = threading.BoundedSemaphore(20)
     NIOSleases  = {}
     reportLeases = {}
     B1leases =  {}
