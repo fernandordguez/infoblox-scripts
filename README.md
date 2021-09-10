@@ -6,7 +6,7 @@
 
 [nios2b1ddi_bulkhosts.py](https://github.com/fernandordguez/infoblox-scripts):        Enables processing of the NIOS bulkhost records
  
-[nios2b1ddi_compareDHCPleases.py](https://github.com/fernandordguez/infoblox-scripts): Compares all the NIOS DHCP leases with the ones in BloxOne after the migration is completed, which provides impreoved visibility of the changes
+[nios2b1ddi_dhcpLeasesB1vsNios.py](https://github.com/fernandordguez/infoblox-scripts): Compares all the NIOS DHCP leases (collected either from WAPI or Grid Backup file) with the leases available in BloxOne. This should provide improved visibility of the changes after a NIOS to BloxOne migration
 
 [hostsWithinDHCPRanges.py](https://github.com/fernandordguez/infoblox-scripts):         When importing Host records into B1DDI, these are split into different types of objects: 
                                                                                         - DNS record types (A, PTR...) 
