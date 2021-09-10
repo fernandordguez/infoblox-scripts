@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# run as: python3 nios2b1ddi_compareDHCPleases -c config.ini -i wapi|onedb.xml
+# run as: python3 nios2b1ddi_compareDHCPleases -c config.ini -i wapi|onedb.xml -r log|csv|gsheet [ --yaml <yaml file> ] [ --help ] [ --delimiter x ]
 
 """
 Copyright (C) Infoblox Inc. All rights reserved.
@@ -37,7 +37,7 @@ instance.
 
 # SYNOPSIS
 
-nios2b1ddi.py -c b1config.ini [ -i wapi | xml ] [ --delimiter x ] [ --yaml <yaml file> ] [ --help ]'
+nios2b1ddi.py -c b1config.ini [ -i wapi | xml ] -r log | csv | gsheet] [ --delimiter x ] [ --yaml <yaml file> ] [ --help ]'
 
 # PARAMETERS
 
@@ -50,8 +50,9 @@ url = 'https://csp.infoblox.com'
 api_version = 'v1'
 api_key = 'API_KEY'
 
-    --delimiter x : use x for the delimiter character in the CSV files.
-
+    -i : interface to be used to collect NIOS leases (WAPI or Grid Backup)
+    
+    -r : method to be used to present the results of the script (log to terminal, csv file or Google sheet)
 # INPUT
 
 The script takes collects the required input from three sources: 
