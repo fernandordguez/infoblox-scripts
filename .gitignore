@@ -131,3 +131,11 @@ Compare DHCP leases nios vs b1ddi/DHCPleases2b1ddi.py
 compDHCPLeases/.DS_Store
 compDHCPLeases/alldataexport.csv
 compDHCPLeases/NEW_DHCPleases2b1ddi.py
+nios2b1ddi_dhcpLeasesB1vsNios/NIOSleases.json
+nios2b1ddi_dhcpLeasesB1vsNios/onedb.xml
+nios2b1ddi_dhcpLeasesB1vsNios/syntegon_n2b1_config.ini
+*.ini
+*.json
+*.csv
+*.json
+*.json

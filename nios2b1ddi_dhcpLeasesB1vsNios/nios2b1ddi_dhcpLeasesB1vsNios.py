@@ -31,9 +31,8 @@ policies, either expressed or implied, of Infoblox.
 
 # DESCRIPTION
 
-This script takes a NIOS
-IBCSV file and imports it into a BloxOne DDI
-instance.
+This script compares all the NIOS DHCP leases (collected either from WAPI or Grid Backup file) with the
+leases available in BloxOne. This should provide improved visibility of the changes after a NIOS to BloxOne migration
 
 # SYNOPSIS
 
@@ -94,7 +93,7 @@ import logging as log
 import json
 import gspread
 import os
-from gspread_formatting import cellFormat,color,textFormat,format_cell_ranges,set_frozen
+from gspread_formatting import format_cell_ranges,set_frozen
 from oauth2client.service_account import ServiceAccountCredentials
 from google.oauth2.service_account import Credentials
 from csv import reader,writer
@@ -173,8 +172,8 @@ def getSubnets(B1Token):                                                        
         netview = {'network_view': spaceNames[listSubn[l]['space']], 'leasesBloxOne': 0, 'leasesNIOS': 0}
         #if subnet in listSubnetsCSP.keys():
         listSubnetsCSP[subnet] = netview
-    return listSubnetsCSP                                                                       #Output is a dictonary with the networks as indexes. This objects will be the basis for the comparson between NIOS and BloxOne DHCP leases.
-                                                                                                #MLeases will be assigned to their correponding subnet (within the correct ip space / network view) where every leases will increase the counters
+    return listSubnetsCSP                                                                       #Output is a dictionary with the networks as indexes. This objects will be the basis for the comparison between NIOS and BloxOne DHCP leases.
+                                                                                                #MLeases will be assigned to their corresponding subnet (within the correct ip space / network view) where every leases will increase the counters
                                                                                                 # This process will be performed both for NIOS and BloxOne to get clear picture of the leases being handled by CSP after the migration from NIOS
                                                                                                 # Which might facilitate the detection of potential issues after the go live
 
@@ -393,20 +392,6 @@ def processNIOSLeases(listSubnets,NIOSleases):
         t.join()
     return listSubnets
 
-        ''' for niosl in NIOSleases:
-            dictSubnets = listSubnets[subnet]
-            dictNIOSleases = NIOSleases[niosl]
-            listparams2 = [niosl,subnet,NIOSleases[niosl],dictNIOSleases]
-            t = threading.Thread(target=countsNIOS, args=(listparams2, dictSubnets))
-            listSubnets[subnet] = dictSubnets
-            t.name = subnet
-            t.start()
-            threads.append(t)
-            #Separatator '''
-    for t in threads:
-        t.join()
-    return listSubnets
-
 def formatGsheet(wks):                                                                                  ## Applies a bit of formatting to the Google Sheet document created
     body = {"requests": [{"autoResizeDimensions": {"dimensions": {"sheetId": wks.id,"dimension": "COLUMNS","startIndex": 0,"endIndex": 8}}}]}
             #{"autoResizeDimensions": {"dimensions": {"sheetId": sh._properties['id'],"dimension": "COLUMNS","startIndex": 0,"endIndex": 8},}}]}
@@ -550,6 +535,3 @@ if __name__ == "__main__":
 # execute only if run as a script
     main()
     sys.exit()
-    
-    
-f = open ('NIOSleases.json','w') 
