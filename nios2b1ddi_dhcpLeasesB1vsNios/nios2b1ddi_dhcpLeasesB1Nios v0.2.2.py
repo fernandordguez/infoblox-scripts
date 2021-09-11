@@ -83,6 +83,7 @@ The output can be currently presented in one of the following three formats (can
 * 0.2.0     Added support for 3 different output options (it can be defined with -r when running the script
 * 0.2.1     When exporting to Google spreadsheets, report will be created always a new worksheet which. Worksheets names
             have a timestamp so this could be used as references to different moments in time when leases were captured
+* 0.2.1     Minor code optimizations
 
 """
 __version__ = '0.2.1'
