@@ -365,7 +365,6 @@ def printReport(reportLeases, repType, SheetName, filteroption):
     # Generates the corresponding Report based on the option specified with -r [log,csv,gsheet]
     totalNIOSLeases = 0
     totalCSPLeases = 0
-
     if repType != "log":  # With log option, we don´t need to created the CSV file so these lines will not be required in that case
         csvfilename = input('Path + Filename of CSV file to export the results to [or enter for "./output.csv" \n') or 'output.csv'
         csvfile = open(csvfilename, 'w', newline='')
@@ -443,14 +442,14 @@ def main():
     maxResultsWAPI = 10000  # This value limits the amount of results received API call performed through NIOS WAPI
     args = get_args()
     b1tenant = checksCSPTenant(args.config)
-    b1tenname = b1tenant.split(' ')[0]
+    b1name = b1tenant.split(' ')[0]
     b1ddi = bloxone.b1ddi(cfg_file = args.config)
     leasesApi, B1Token = authAPI(b1ddi.api_key)
     IPSpaces = getIPSpaceNamesFromId(B1Token)  # Used to convert Space IDs into Space names
     listSubnets = getSubnets(B1Token)  # List of all subnets in B1 --> ['network']{['address', 'network_view']}
     B1leases = getBloxOneLeases(leasesApi, maxResultsB1API, IPSpaces)
     # Collect BloxOne leases from B1DDI API  --> ['address']{['network_view',}
-    if args.interface == 'wapi':  # if WAPI --> it will get NIOS leases from the Grid WAPI interface
+    if args.interface.lower() == 'wapi':  # if WAPI --> it will get NIOS leases from the Grid WAPI interface
         gm_ip = input('Please type the IP address of the Grid Master [or press enter for 192.168.1.2]\n') or '192.168.1.2'
         while not validate_ip(gm_ip):
             print('IP address not valid')
@@ -460,7 +459,7 @@ def main():
         auth_pwd = getpass.getpass('Please enter your password\n')
         NIOSleases = getLeasesWAPI(gm_ip, auth_usr, auth_pwd, maxResultsWAPI)
         # Collect NIOS leases from NIOS WAPI     --> ['_ref', 'address', 'binding_state', 'network', 'network_view']
-    elif args.interface == 'xml':  # if XML --> it will get the DHCP leases from the Grid Backup (onedb.xml file)
+    elif args.interface.lower() == 'xml':  # if XML --> it will get the DHCP leases from the Grid Backup (onedb.xml file)
         try:
             xmlfile = input('Please enter full path + filename of the Grid backup file [or press enter for ./onedb.xml] \n') or "./onedb.xml"
             NIOSleases = getGridBackupleases(xmlfile)
@@ -470,7 +469,7 @@ def main():
             print('Exception when collecting Grid Backup Leases: %s\n' % e)
 
     if args.report.lower() == 'gsheet':
-        SheetName = input('Name of the Gsheet where the results will be exported [or press enter for "nios2b1ddi leases"\n') or ('nios2b1ddi leases - ' + b1tenname)
+        SheetName = input('Name of the Gsheet where the results will be exported [or press enter for "nios2b1ddi leases"\n') or ('nios2b1ddi leases - ' + b1name)
 
     # After collecting all leases from NIOS and BloxOne, it compares both sets and creates a report with the differences
     reportLeases = comparesLeasesNIOS_BloxOne(B1leases, listSubnets, NIOSleases)
