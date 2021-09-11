@@ -1,6 +1,6 @@
 # **infoblox-scripts**
 
-<p> This repository contains multiple Python scripts that have been developed primarily to automate some of workflows that usually are taken to migrated a NIOS envrionment to BloxOne
+<p> This repository contains multiple Python scripts that have been developed primarily to automate some of workflows that usually are required to migrate from a NIOS envrionment to BloxOne - Infoblox SaaS solution.
 
 [createHWFilter](https://github.com/fernandordguez/infoblox-scripts) :                Creates IPv4 Hardware Filter in BloxOne DDI from a CSV file with a list of MACs (column must have a header called       mac_address)
 
