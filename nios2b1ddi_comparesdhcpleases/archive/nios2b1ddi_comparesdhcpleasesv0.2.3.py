@@ -122,7 +122,6 @@ from sty import fg, bg, ef, rs
 import json
 import gspread
 import os
-import gspread_formatting
 from gspread_formatting import *
 import csv
 import time
@@ -308,7 +307,6 @@ def comparesleasesniosbloxone(b1leases, listSubnets, niosleases):  ## Receives N
     return listSubnets
 
 
-# noinspection PyUnresolvedReferences
 def formatGsheet(wks):  ## Applies a bit of formatting to the Google Sheet document created
     body = {"requests": [{"autoResizeDimensions": {
         "dimensions": {"sheetId": wks.id, "dimension": "COLUMNS", "startIndex": 0, "endIndex": 8}}}]}
@@ -462,9 +460,11 @@ def main():
     IPSpaces = getipspacenamesfromid(tokenb1)
     b1leases = getleasesbloxone(b1ddi.api_key, maxresultsb1api)
     listSubnets = getSubnets(tokenb1, IPSpaces)  # List of all subnets in B1
-    if args.interface.lower() == 'wapi':  # It will get NIOS leases from the Grid WAPI interface
+    if args.interface.lower() == 'wapi':  # if WAPI --> it will get NIOS leases from the Grid WAPI interface
         niosleases = getleaseswapi(maxresultswapi)
-    elif args.interface.lower() == 'xml': # NIOS leases will be obtained from a Grid backup file (default onedb.xml)
+        # Collect NIOS leases from NIOS WAPI
+    if args.interface.lower() == 'xml':
+        # NIOS leases will be obtained from a Grid backup file (default onedb.xml)
         xmlfile = input('Enter path + filename for Grid backup [or press enter for ./onedb.xml] \n') or "./onedb.xml"
         try:
             niosleases = getleasesgridbackup(xmlfile)
