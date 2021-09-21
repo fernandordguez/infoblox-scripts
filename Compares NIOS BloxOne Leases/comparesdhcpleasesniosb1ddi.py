@@ -201,7 +201,6 @@ def getSubnets(tokenb1, ipspaces):  # It will get all the networks available in 
 def getleaseswapi(maxresultswapi, conf):
     niosleases = {}
     templeases = []
-    #gm_ip = input('Please type the IP address of the Grid Master [or press enter for 192.168.1.2]\n') or '192.168.1.2'
     gm_ip = conf['gm_ip']
     gm_usr = conf['gm_usr']
     gm_pwd = conf['gm_pwd']
@@ -224,11 +223,8 @@ def getleaseswapi(maxresultswapi, conf):
             print('API call error, review username and password and confirm WAPI IP is reachable')
             return
     for ipadd in templeases:  # Leases with status of FREE are not considered
-        tempdict = {}
         if ipadd['binding_state'].lower() in ['active', 'static']:
-            #tempdict = {'network_view': ipadd['network_view']}
             niosleases[ipadd['address']] = {'network_view': ipadd['network_view']}
-            #niosleases.update({ipadd['address']: tempdict})
     return niosleases
 
 
@@ -253,19 +249,17 @@ def getleasesbloxone(apiKey, maxresultsb1api):
         except ApiException as e:
             print("Exception when calling LeaseApi->lease_list: %s\n" % e)
     for lease in templeases:
-        tempdict = {}
-        if lease.state.lower() in ['issued', 'used']:  # In BloxOne Leases States are Issued, Used or Freed
-            # (NIOS: Active, Static)
-            tempdict = {'network_view': ipspaces[lease.space]} # Gets the net. view/IP space name from the IP Space ID
-            b1leases[lease.address] = tempdict
+        if lease.state.lower() in ['issued', 'used']:   # In BloxOne Leases States are Issued, Used or Freed
+                                                        # (NIOS: Active, Static)
+            b1leases.update({lease.address: {'network_view': ipspaces[lease.space]}})
     return b1leases
 
 
 def getleasesgridbackup(xmlfile):  # Returns niosleases extracted from Grid Backup file
     # ['_ref', 'address', 'binding_state', 'network', 'network_view']
     listobjects = []
-    niosleases = {}
     netviews = {}
+    niosleases = {}
     try:
         fxmml = open(xmlfile, 'r')
         xml_content = fxmml.read()
@@ -280,11 +274,10 @@ def getleasesgridbackup(xmlfile):  # Returns niosleases extracted from Grid Back
             if ob['__type'] == '.com.infoblox.dns.network_view':
                 netviews[ob['id']] = ob['name']
         for ob in listobjects:
-            tempobject = {}
             if (ob['__type'] == '.com.infoblox.dns.lease') and (
                     ob['binding_state'].lower() in ['active', 'static']):
+                tempobject = {}
                 tempobject = {'network_view': netviews[ob['network_view']]}
-                # niosleases.update({ob['ip_address']: tempobject})
                 niosleases[ob['ip_address']] = tempobject
     except (FileNotFoundError, IOError):
         print('File not found')
@@ -304,7 +297,6 @@ def comparesleasesniosbloxone(b1leases,listsubnets,niosleases):  ## Receives NIO
                 if listsubnets[subnet]['network_view'] == niosleases[lease]['network_view']:
                     counterNIOS += 1       # If both conditions=TRUE, counter for that network increased ---> NIOS leases
         listsubnets[subnet].update({'leasesNIOS': counterNIOS, 'leasesBloxOne': counterBloxOne})
-
     return listsubnets
 
 
@@ -410,6 +402,8 @@ def printReport(reportleases, repType, filteroption, b1name, conf):
         spamwriter.writerow(['Total number of leases in NIOS :', totalniosleases])
         spamwriter.writerow(['Total number of leases in BloxOne :','', totalcspleases])
         csvfile.close()
+        t2 = time.perf_counter() - t1
+        print(f' Process completed. Execution time : {t2:0.2f}s ')
         if repType == "csv":
                 print('Results have been exported to the CSV file', conf['csvfile'])
         elif repType == "gsheet":  # With log option, we don´t need to created the CSV file so this lines are not required in that case
@@ -455,8 +449,6 @@ def get_args():  ## Handles the arguments passed to the script from the command 
 
 
 def main():
-    listsubnets = {}
-    niosleases = {}
     b1leases = {}
     maxresultsb1api = 5000  # This value limits the amount of results received for an API call through BloxOne API
     maxresultswapi = 10000  # This value limits the amount of results received API call performed through NIOS WAPI
@@ -482,8 +474,7 @@ def main():
     # It will display the results of the analysis: - directly on the terminal (log)
     #  - export to a CSV file (csv)
     #  - export to a Google Sheet (gsheet) **(requires service_account)
-    t2 = time.perf_counter() - t1
-    print(f' Process completed. Execution time : {t2:0.2f}s ')
+
 
 if __name__ == "__main__":
     # execute only if run as a script
