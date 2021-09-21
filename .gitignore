@@ -137,6 +137,7 @@ nios2b1ddi_dhcpLeasesB1vsNios/syntegon_n2b1_config.ini
 *.ini
 *.json
 *.csv
+<<<<<<< HEAD
 *.json
 *.json
 *.xml
@@ -153,3 +154,10 @@ nios2b1ddi_comparesdhcpleases/.DS_Store
 .DS_Store
 .DS_Store
 >>>>>>> Stashed changes
+=======
+nios2b1ddi_comparesdhcpleases/syntegon_n2b1_config.ini
+nios2b1ddi_comparesdhcpleases/onedb.xml
+nios2b1ddi_comparesdhcpleases/.DS_Store
+.DS_Store
+.DS_Store
+>>>>>>> main
