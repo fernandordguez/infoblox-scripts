@@ -134,3 +134,5 @@ compDHCPLeases/NEW_DHCPleases2b1ddi.py
 *.csv
 nios2b1ddi_comparesdhcpleases/syntegon_n2b1_config.ini
 nios2b1ddi_comparesdhcpleases/onedb.xml
+nios2b1ddi_comparesdhcpleases/.DS_Store
+.DS_Store
