@@ -131,9 +131,33 @@ Compare DHCP leases nios vs b1ddi/DHCPleases2b1ddi.py
 compDHCPLeases/.DS_Store
 compDHCPLeases/alldataexport.csv
 compDHCPLeases/NEW_DHCPleases2b1ddi.py
+nios2b1ddi_dhcpLeasesB1vsNios/NIOSleases.json
+nios2b1ddi_dhcpLeasesB1vsNios/onedb.xml
+nios2b1ddi_dhcpLeasesB1vsNios/syntegon_n2b1_config.ini
+*.ini
+*.json
 *.csv
+<<<<<<< HEAD
+*.json
+*.json
+*.xml
+nios2b1ddi_comparesdhcpleases/.DS_Store
+nios2b1ddi_comparesdhcpleases/.DS_Store
+<<<<<<< HEAD
+.DS_Store
+<<<<<<< Updated upstream
+nios2b1ddi_comparesdhcpleases/.DS_Store
+=======
+>>>>>>> parent of af52b69 (added DS_Store to the gitignore)
+nios2b1ddi_comparesdhcpleases/.DS_Store
+=======
+.DS_Store
+.DS_Store
+>>>>>>> Stashed changes
+=======
 nios2b1ddi_comparesdhcpleases/syntegon_n2b1_config.ini
 nios2b1ddi_comparesdhcpleases/onedb.xml
 nios2b1ddi_comparesdhcpleases/.DS_Store
 .DS_Store
 .DS_Store
+>>>>>>> main

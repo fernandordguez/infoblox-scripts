@@ -31,9 +31,8 @@ policies, either expressed or implied, of Infoblox.
 
 # DESCRIPTION
 
-This script takes a NIOS
-IBCSV file and imports it into a BloxOne DDI
-instance.
+This script compares all the NIOS DHCP leases (collected either from WAPI or Grid Backup file) with the
+leases available in BloxOne. This should provide improved visibility of the changes after a NIOS to BloxOne migration
 
 # SYNOPSIS
 
@@ -94,13 +93,19 @@ import logging as log
 import json
 import gspread
 import os
-from gspread_formatting import cellFormat,color,textFormat,format_cell_ranges,set_frozen
+from gspread_formatting import format_cell_ranges,set_frozen
 from oauth2client.service_account import ServiceAccountCredentials
 from google.oauth2.service_account import Credentials
 from csv import reader,writer
 import csv
+import threading
+from threading import BoundedSemaphore
+import urllib3
+import concurrent.futures
+import urllib.request
 
-requests.packages.urllib3.disable_warnings()
+#requests.packages.urllib3.disable_warnings()
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def validate_ip(ip):                                                                                    ## It is used to confirm that the leases are valid IP addresses
     try:
@@ -157,15 +162,18 @@ def getIPSpaceNamesFromId (B1Token):                                            
 def getSubnets(B1Token):                                                                                ## It will get all the networks available in CSP for this tenant
     spaceNames = getIPSpaceNamesFromId(B1Token)
     listSubnetsCSP = {}
+    listSubn = {}
+    netview = {}
     url = "https://csp.infoblox.com/api/ddi/v1//ipam/subnet?_fields=address,cidr,space"
-    response = requests.request("GET", url, headers=B1Token)
-    listSubn = json.loads(response.content)['results']
-    for subn in listSubn:
-        cidr = subn['address'] + '/' + str(subn.pop('cidr'))
-        subn.update({'network_view': spaceNames[subn.pop('space')]})
-        listSubnetsCSP[cidr] = subn
-    return listSubnetsCSP                                                                       #Output is a dictonary with the networks as indexes. This objects will be the basis for the comparson between NIOS and BloxOne DHCP leases.
-                                                                                                #MLeases will be assigned to their correponding subnet (within the correct ip space / network view) where every leases will increase the counters
+    response = requests.request("GET", url, headers=B1Token).json()
+    listSubn = response['results']
+    for l in range(len(listSubn)):
+        subnet = listSubn[l]['address'] + '/' + str(listSubn[l]['cidr'])
+        netview = {'network_view': spaceNames[listSubn[l]['space']], 'leasesBloxOne': 0, 'leasesNIOS': 0}
+        #if subnet in listSubnetsCSP.keys():
+        listSubnetsCSP[subnet] = netview
+    return listSubnetsCSP                                                                       #Output is a dictionary with the networks as indexes. This objects will be the basis for the comparison between NIOS and BloxOne DHCP leases.
+                                                                                                #MLeases will be assigned to their corresponding subnet (within the correct ip space / network view) where every leases will increase the counters
                                                                                                 # This process will be performed both for NIOS and BloxOne to get clear picture of the leases being handled by CSP after the migration from NIOS
                                                                                                 # Which might facilitate the detection of potential issues after the go live
 
@@ -215,7 +223,7 @@ def getGridBackupleases (xmlfile):                                              
             netViews[ob['id']] = ob['name']
             # Separator       
     for ob in listObjects:
-        if (ob['__type'] == '.com.infoblox.dns.lease') and (ob['binding_state'].lower() in ['active','static', 'backup']):
+        if (ob['__type'] == '.com.infoblox.dns.lease') and (ob['binding_state'].lower() in ['active','static']):
             tempObject = {}
             tempObject['network_view'] = netViews[ob['network_view']]
             NIOSleases.update({ob['ip_address']: tempObject})
@@ -242,10 +250,13 @@ def getLeasesWAPI(gm_ip, auth_usr, auth_pwd, maxResultsWAPI):                   
             print('API call error, review username and password and confirm WAPI IP is reachable')
             return
     for l in templeases:
-        if (l['binding_state'].lower()) in ['active','static', 'backup']:                              ## Leases with status of FREE are not considered
+        if (l['binding_state'].lower()) in ['active','static']:                              ## Leases with status of FREE are not considered
             tempDict = {}
             tempDict['network_view'] = l['network_view']
             NIOSleases.update({l['address'] : tempDict})
+    with open('NIOSleases.json', 'w') as file:
+        json_string = json.dumps(NIOSleases, indent=4)
+        file.write(json_string)
     return NIOSleases                                                                                  ## Returns NIOSleases --> ['_ref', 'address', 'binding_state', 'network', 'network_view']
 
 ## Next function will compare the leases previously collected from NIOS and BloxOne. 3 types of Reports are available:
@@ -267,6 +278,118 @@ def comparesLeasesNIOS_BloxOne(B1leases, listSubnets, NIOSleases):              
                 if listSubnets[subnet]['network_view'] == NIOSleases[lease]['network_view']:
                     counterNIOS += 1                                                                    # If both conditions are met, the counter for that network is increased    ---> NIOS leases
         listSubnets[subnet].update({'leasesNIOS': counterNIOS, 'leasesBloxOne': counterBloxOne})
+    return listSubnets
+
+def countBloxOneLeases(listparams, dictSubnets):                                       ## Receives NIOS leases as input (obtained via WAPI from the GM)                                                                                                    ## It also receives a list of the Subnets/Networks to use it as basis for the classification 
+    #lease = listparams[0]
+    #subnet = listparams[1]
+    #dictB1leases = listparams[2]
+    #dictSubnets = listparams[3]
+    #keysSubnets = listparams[4]
+    if (IPv4Address(listparams[0]) in IPv4Network(listparams[1])):                                             ## With the ipaddress library, we can validate that the IP address of the leases belongs to a network
+        if (listparams[1] in listparams[4]) and (listparams[2] != {}):
+            if listparams[3]['network_view'] == listparams[2]['network_view']:
+                listparams[3].update({'leasesBloxOne': listparams[3]['leasesBloxOne']+1})
+    return listparams[3]                                                                   ## If both conditions are met, the counter for that network is increased    --> BloxOne leases
+                                                                                                ## If both conditions are met, the counter for that network is increased    ---> NIOS leases '''
+
+def countsNIOS(listparams, dictSubnets):                                       ## Receives NIOS leases as input (obtained via WAPI from the GM)                                                                                               ## It also receives a list of the Subnets/Networks to use it as basis for the classification 
+    #lease = listparams[0]
+    #subnet = listparams[1]
+    #dictNIOSleases = listparams[2]
+    if (IPv4Address(listparams[0]) in IPv4Network(listparams[1])):
+        if listparams[3]['network_view'] == listparams[2]['network_view']:
+            #counterNIOS = 
+            listparams[3].update({'leasesNIOS': listparams[3]['leasesNIOS']+1})
+            dictSubnets = listparams[3]
+    return dictSubnets
+                                                                                ## If both conditions are met, the counter for that network is increased    ---> NIOS leases '''
+
+def processB1Leases_old(listSubnets,B1leases):
+    threads = list()
+    dictSubnets = {}
+    
+    listparams = []
+    for subnet in listSubnets:
+        for lease in B1leases:
+            dictSubnets = listSubnets[subnet]
+            dictB1leases = B1leases[lease]
+            keySubnets = list(listSubnets.keys())
+            listparams = [lease, subnet, dictB1leases, dictSubnets, keySubnets]
+            t = threading.Thread(target=countBloxOneLeases, args=(listparams, listSubnets[subnet]))
+            listSubnets[subnet] = dictSubnets
+            t.name = subnet
+            t.start()
+            print(t.name)
+            threads.append(t)
+    for t in threads:
+        t.join()
+    return listSubnets
+
+def processB1Leases_old(subnet,listparams):
+    threads = list()
+    dictSubnets = {}
+    
+    for lease in listparams[1]:
+        dictSubnets = listparams[0][subnet]
+        dictB1leases = listparams[1][lease]
+        keySubnets = list(listparams[0].keys())
+        listparams = [lease, subnet, dictB1leases, dictSubnets, keySubnets]
+        t = threading.Thread(target=countBloxOneLeases, args=(listparams, listparams[0][subnet]))
+        listparams[0][subnet] = dictSubnets
+        t.name = subnet
+        t.start()
+        print(t.name)
+        threads.append(t)
+    for t in threads:
+        t.join()
+    return listparams[0]
+
+
+def processB1Leases(listSubnets,B1leases):
+    threads = list()
+    listparams = []
+    for subnet in listSubnets:
+        for lease in B1leases:
+            listparams = [lease, subnet, B1leases[lease], listSubnets[subnet], list(listSubnets.keys())]
+            t = threading.Thread(target=countBloxOneLeases, args=(listparams, listSubnets[subnet]))
+            #t.name = subnet
+            t.start()
+            #print(t.name)
+            threads.append(t)
+    #for t in threads:
+    #    t.join()
+    return listSubnets
+
+listparams = [listSubnets, B1leases]
+with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    future_to_processB1Leases = {executor.submit(processB1Leases,subnet,listparams) : subnet for subnet in listSubnets}
+    for future in concurrent.futures.as_completed(future_to_processB1Leases):
+        subnet = future_to_processB1Leases[future]
+        try:
+            data = future.result()
+        except Exception as exc:
+            print('%r generated an exception: %s' % (subnet, exc))
+        else:
+            print('%r page is %d bytes' % (subnet, len(data)))
+        
+def processNIOSLeases(listSubnets,NIOSleases):
+    threads = list()
+    dictSubnets = {}
+    listparams = []
+    for subnet in listSubnets:
+        for lease in NIOSleases:
+            dictSubnets = listSubnets[subnet]
+            dictNIOSleases = NIOSleases[lease]
+            listparams = [lease,subnet,NIOSleases[lease],dictNIOSleases]
+            t = threading.Thread(target=countsNIOS, args=(listparams, dictSubnets))
+            listSubnets[subnet] = dictSubnets
+            t.name = subnet
+            t.start()
+            threads.append(t)
+            #Separatator
+    for t in threads:
+        t.join()
     return listSubnets
 
 def formatGsheet(wks):                                                                                  ## Applies a bit of formatting to the Google Sheet document created
@@ -364,9 +487,11 @@ def get_args():                                                                 
 ##########################################################
 
 def main():
+    threadLimiter = threading.BoundedSemaphore(20)
     NIOSleases  = {}
     reportLeases = {}
     B1leases =  {}
+    listSubnets = {}
     SheetName = ''
     maxResultsB1API = 5000                                                                              ## This value limits the amount of results received for an API call through BloxOne API. Used in combination with paging
     maxResultsWAPI = 10000                                                                              ## This value limits the amount of results received for an API call performed through NIOS WAPI. Used in combination with paging
@@ -401,6 +526,7 @@ def main():
     
     #After collecting all leases from NIOS and BloxOne, it compares both sets and creates a report with the differences
     reportLeases = comparesLeasesNIOS_BloxOne(B1leases, listSubnets, NIOSleases)  
+    reportLeases = comparesLeases(listSubnets,B1leases,NIOSleases)
     printReport(reportLeases,args.report.lower(),SheetName)                                                 ## It will display the results of the analysis: - directly on the terminal (log)
                                                                                                                                                         #  - export to a CSV file (csv)
                                                                                                                                                         #  - export to a Google Sheet (gsheet) **(requires service_account)
