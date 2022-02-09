@@ -1,0 +1,56 @@
+---
+# NIOS onedb analysis report configuration file
+version: 0.2.0
+# Last updated: 20210818
+# Author: Chris Marrison
+
+# Report Output (future use)
+output_path: 
+zip_reports: False
+
+report_sections:
+  - processed
+  - collected
+  - counters
+  - features
+  - member_counts
+  - activeip
+  - summary
+  # - srg
+
+# Define Keys for uniqueness matching in summary reports
+summary_items:
+  DHCP_Options:
+    name: DHCP_Options
+    keys:
+      - STATUS
+      - OPTIONSPACE
+      - OPTIONCODE
+  Networks:
+    name: IPAM_Networks
+    keys:
+      - STATUS
+      - CIDR
+  MAC_Filter_Items:
+    name: MAC_Prefix_Filters
+    keys:
+      - STATUS
+      - MAC_FILTER
+
+# Currently Not used
+Incompatible Features:
+  - DHCPv6:
+      section: features
+  - BOOTP:
+      section: collected
+      objects: 
+        - .com.infoblox.dns.cluster_dhcp_properties
+        - .com.infoblox.dns.member_dhcp_properties
+        - .com.infoblox.dns.network
+      properties: 
+      value: 
+
+# SRG Objects (srg reporting.
+srg_objects:
+  - .com.infoblox.dns.srg
+  - .com.infoblox.dns.srg_zone_linking

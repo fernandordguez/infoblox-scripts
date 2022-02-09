@@ -1,0 +1,557 @@
+---
+# NIOS onedb analysis configuration file
+version: 0.4.2
+# Last updated: 20210825
+# Author: Chris Marrison
+
+# Potential future use
+db_type: NIOS
+
+# Incompatible DHCP Options
+incompatible_options:
+  - 12
+  - 58
+  - 59
+  - 90
+  - 91
+  - 92
+  - 94
+  - 95
+  - 96
+  - 115
+  - 120
+  - 121
+  - 122
+  - 123
+  - 124
+  - 125
+  - 126
+  - 127
+  - 146
+  - 156
+  - 159
+  - 212 
+
+# DHCP Options that need further validation
+validate_options:
+  - 43
+  - 151
+  - 152
+  - 153
+  - 154
+  - 155
+  - 157
+  - 160
+  - 224
+  - 242
+
+# Previously Checked DHCP Options
+legacy_option_checks:
+
+# List of objects and parameters
+objects:
+  #Template object
+  object: 
+      type: obj_type
+      header: header
+      actions:
+        - process
+        - collect
+        - count
+        - feature
+        - member
+        - activeip
+      func: proc_obj
+      feature: feature_desc
+      properties:
+        - list
+        - of
+        - properties
+      ip_field:
+        - field_name
+      keypair:
+        - property_name
+        - expected_value
+
+  # Grid
+  .com.infoblox.one.cluster:
+    type: Grid
+    actions:
+      - collect
+    properties:
+      - name
+      - virtual_node_count
+      - physical_node_count
+      - heka_opt_in
+      - enable_wins_forwarding
+      - enable_extended_discovery
+      - enable_rir_swip
+
+  # Nodes
+  .com.infoblox.one.physical_node:
+    type: Physical Node
+    actions:
+      - collect
+    properties:
+      - hwplatform:
+      - hwtype
+      - hwid
+      - mgmt_port_enabled
+      - virtual_node
+      
+  .com.infoblox.one.virtual_node:
+    type: Member
+    actions:
+      - collect
+    properties:
+      - member_type
+      - virtual_oid
+      - host_name
+      - ha_enabled
+      - ipv6_enabled
+      - is_master
+      - is_potential_master
+
+  # Licenses
+  .com.infoblox.one.product_license:
+    type: Licenses
+    actions:
+      - collect
+    properties:
+      - license_kind
+      - license_string
+      - license_type
+      - pnode
+      - expiry_date
+
+  # Cluster DHCP Config
+  .com.infoblox.dns.cluster_dhcp_properties:
+      type: Grid DHCP Settings
+      actions:
+        - collect
+      properties:
+        - dns_update_style
+        - enable_cisco_ise_dhcpd_lease_publishing
+        - enable_gss_tsig
+        - v6_enable_gss_tsig
+        - v6_leases_scavenging_enabled
+        - v6_leases_scavenging_grace_period
+        - enable_expert_mode
+        - enable_ifmap
+        - enable_roaming_hosts
+        - ping_number
+        - boot_server
+        - boot_file
+        - next_server
+        - pxe_lease_time_enabled
+        - overload_bootp
+        - deny_bootp
+        - recycle_leases
+
+  # Member DHCP Config
+  .com.infoblox.dns.member_dhcp_properties:
+      type: Member DHCP Settings
+      actions:
+        - collect
+        - feature
+      feature: DHCPv6
+      keypair:
+        - v6_service_enable
+        - 'true'
+      properties:
+        - dns_update_style
+        - dhcp_utilization
+        - static_hosts
+        - dynamic_hosts
+        - total_hosts
+        - enable_cisco_ise_dhcpd_lease_publishing
+        - enable_gss_tsig
+        - use_gss_tsig_keys
+        - v6_enable_gss_tsig
+        - enable_expert_mode
+        - enable_ifmap
+        - enable_roaming_hosts
+        - ping_number
+        - override_boot_server
+        - override_boot_file
+        - override_next_server
+        - boot_server
+        - boot_file
+        - next_server
+        - deny_bootp
+        - pxe_lease_time_enabled
+        - overload_bootp
+        - ignore_id
+        - use_ignore_id
+        - recycle_leases
+        - service_enabled
+        - v6_service_enable
+        - use_v6_leases_scavenging
+        - virtual_node
+
+  # Cluster DNS Config
+  .com.infoblox.dns.cluster_dns_properties:
+      type: Grid DNS Settings
+      actions:
+        - collect
+      feature: DNS64
+      keypair:
+        - enable_dns64
+        - 'true'
+      properties:
+        - dns_health_check_enabled
+        - allow_gss_tsig_zone_updates
+        - enable_gss_tsig
+        - v6_enable_gss_tsig
+        - enable_dns64
+        - blacklist_enabled
+
+  # Member DNS Config
+  .com.infoblox.dns.member_dns_properties:
+      type: Member DNS Properties
+      actions:
+        - collect
+        - feature
+      feature: DNS64
+      keypair:
+        - enable_dns64
+        - 'true'
+      properties:
+        - dns_health_check_enabled
+        - allow_gss_tsig_zone_updates
+        - enable_dns64
+        - enable_gss_tsig
+        - log_queries
+        - service_enabled
+        - virtual_node
+
+  # NTP Service
+  .com.infoblox.one.vnode_time:
+    type: NTP_Server
+    actions:
+        - collect
+        - feature
+    feature: NTP_Server
+    keypair:
+        - ntp_service_enabled
+        - 'true'
+    properties:
+        - enable_authentication
+        - external_ntp_servers_enabled
+        - ntp_service_enabled
+        - time_zone
+        - virtual_node
+
+  # DHCP Options
+  .com.infoblox.dns.option:
+      type: DHCP_Options
+      header: HEADER-DHCPOPTION,STATUS,OBJECTTYPE,OBJECT,OPTIONSPACE,OPTIONCODE,OPTIONVALUE,OBJECTLINE
+      actions:
+        - process
+      func: processdhcpoption
+
+  # Network Views
+  .com.infoblox.dns.network_view:
+      type: Network_Views
+      actions:
+        - collect
+      properties:
+        - id
+        - name
+        - use_subscribe_settings
+        - enable_view_display
+        - netmri_id
+
+  # IPv4 Networks 
+  .com.infoblox.dns.network:
+      type: Networks
+      header: HEADER-DHCPNETWORK,STATUS,NETWORK,CIDR,OBJECTLINE
+      actions:
+        - count
+        - process
+        - collect
+      properties:
+        - address
+        - network_view
+        - cidr
+        - override_boot_server
+        - override_boot_file
+        - override_next_server
+        - boot_server
+        - boot_file
+        - next_server
+        - pxe_lease_time_enabled
+        - deny_bootp
+      func: process_network
+  
+  # IPv6 Networks
+  .com.infoblox.dhcp.ipv6.networks:
+      type: IPV6_Networks
+      actions:
+        - count
+        - feature
+      feature: IPv6_Networks
+
+  # DHCP leases
+  .com.infoblox.dns.lease:
+      type: DHCP_Leases
+      header: HEADER-LEASECOUNT,MEMBER,ACTIVELEASES
+      actions:
+        - count
+        - member
+        - activeip
+        # - collect
+      func: member_leases
+      properties:
+        - binding_state
+        - vnode_id
+  
+  .com.infoblox.dns.fixed_address:
+      type: Fixed_Address
+      actions:
+        - count
+        - activeip
+  
+  .com.infoblox.dns.dhcp_failover_association:
+      type: DHCP_FO
+      actions:
+        - collect
+      properties:
+        - name
+        - primary_server_vnode
+        - secondary_server_vnode
+        - split
+  
+  .com.infoblox.dns.cluster_mac_filterset_item:
+      type: MAC_Filter_Items
+      header: HEADER-MACPREFIX,STATUS,MAC_PREFIX,MAC_FILTER,OBJECTLINE
+      actions:
+          - process
+      func: process_mac_filter_item
+
+  # Fingerprint Filters
+  .com.infoblox.dns.fingerprint_filter_rule:
+      type: DHCP_Fingerprint_Filter
+      actions:
+        - feature
+      feature: DHCP_Fingerprint_Filter
+      keypair:
+        - __type
+        - .com.infoblox.dns.fingerprint_filter_rule
+
+  # Views & Zones
+  .com.infoblox.dns.view:
+      type: DNS View      
+      actions:
+        - collect
+      properties:
+        - displayname
+        - blacklist_enabled
+        - blacklist_action
+        - enable_dns64
+        - filter_aaa
+        - enable_mat_recursion_only
+        - enable_rpz_recursive_only
+        - forwarders_only
+        - is_ddns_view
+        - network_view
+        - recursion_enabled
+        - use_dns64
+        - zone
+
+  .com.infoblox.dns.zone:
+      type: DNS_Zones
+      actions:
+          - count
+          - collect
+      func: process_zone
+      properties:
+          - name
+          - display_name
+          - fqdn
+          - view_key
+          - zone_type
+          - primary_type
+          - parent
+          - is_multimaster
+          - is_external_primary
+          - assigned_ns_group
+
+  # DTC
+  .com.infoblox.dns.dtc:
+        type: DTC
+        actions:
+            - feature
+        feature: DTC
+
+  .com.infoblox.dns.idns_lbdn:
+    type: LBDN Record
+    actions:
+        - collect
+        - count
+    properties:
+      - name
+      - lb_method
+      - types
+      - persistence
+      - use_ttl
+
+  .com.infoblox.dns.idns_pool:
+    type: LBDN Pool
+    actions:
+      - collect
+    properties:
+      - alternate_method
+      - availability
+      - name
+      - preferred_method
+      - preferred_topology
+
+  # Captive Portal
+  .com.infoblox.dns.member_dhcp_captive_portal:
+        type: Captive_Portal
+        actions:
+            - feature
+        feature: Captive_Portal
+
+  # Blocklist
+  .com.infoblox.analytics.active_blacklist_rpz:
+      type: blacklist
+      actions:
+        - count
+        
+  
+  # Outbound API
+  .com.infoblox.one.endpoint:
+    type: Outbound_API
+    actions:
+      - collect
+    properties:
+      - disabled
+      - type
+
+  .com.infoblox.one.endpoint_restapi:
+    type: Outbound_API_RestAPI
+    actions:
+      - collect
+    properties:
+      - vendor_identifier
+
+  .com.infoblox.one.template_restapi:
+    type: Outbound_API_Endpoint
+    actions:
+      - feature
+      - collect
+    feature: Outbound_REST
+    keypair:
+      - outbound_type
+      - REST
+    properties:
+      - name
+      - outbound_type
+      - template_type
+      - vendor_identifier
+      - event_type_list
+  
+  # Data Connector
+  .com.infoblox.one.datacollector_cluster:
+    type: Data_Connector
+    actions:
+      - collect
+    properties:
+      - enable_registration
+
+  # DNS Records Types
+  .com.infobox.dns.host:
+    type: Host_Records
+    actions:
+      - count
+
+  .com.infobox.dns.host_address:
+    type: Host_Records
+    actions:
+      - count
+      - activeip
+
+  .com.infobox.dns.host_alias:
+    type: Host_Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_a:
+    type: A_Records
+    actions:
+      - count
+      - activeip
+
+  .com.infoblox.dns.bind_aaaa:
+    type: AAAA_Records
+    actions:
+      - count
+      - activeip
+
+  .com.infoblox.dns.bind_cname:
+    type: CNAME_Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_dname:
+    type: DNAME_Records
+    actions:
+      - count
+      - feature
+    feature: DNAME Records
+    keypair:
+      - __type
+      - .com.infoblox.dns.bind_dname
+
+  .com.infoblox.dns.bind_dnskey:
+    type: DNSKEY_Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_mx:
+    type: MX_Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_ns:
+    type: NS_Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_nsec3:
+    type: NSEC3_Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_nsec3param:
+    type: NSEC3PARAM_Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_ptr:
+    type: PTR_Records
+    actions:
+      - count
+      - activeip
+
+  .com.infoblox.dns.bind_rrsig:
+    type: RRSIG_Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_soa:
+    type: SOA Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_srv:
+    type: SRV_Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_txt:
+    type: TXT_Records
+    actions:
+      - count
