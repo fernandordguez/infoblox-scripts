@@ -84,6 +84,8 @@ The output can be currently presented in one of the following three formats (can
 * 0.2.1     When exporting to Google spreadsheets, report will be created always a new worksheet which. Worksheets names
             have a timestamp so this could be used as references to different moments in time when leases were captured
 * 0.2.2     Minor code optimizations
+* 0.2.4     Code optimizations to improve performance of some of the fucntions used to process the leases
+            Added configuration with multiple to avoid terminal input requiring user action
 
 # TECHNICAL REFERENCE
 
@@ -269,7 +271,7 @@ def getleasesgridbackup(xmlfile):  # Returns niosleases extracted from Grid Back
             anobject = {}
             for item in (obj['PROPERTY']):
                 anobject[item['@NAME']] = item['@VALUE']
-                listobjects.append(anobject)
+            listobjects.append(anobject)
         for ob in listobjects:
             if ob['__type'] == '.com.infoblox.dns.network_view':
                 netviews[ob['id']] = ob['name']
@@ -426,7 +428,7 @@ def get_args():  ## Handles the arguments passed to the script from the command 
     # Required Argument(s)
     required = par.add_argument_group('Required Arguments')
     req_grp = required.add_argument
-    req_grp('-c', '--config', action="store", dest="config", help="Path to ini file with API key", required=True)
+    req_grp('-c', '--config', action="store", dest="config", help="Path to ini file with API key", required=True, default = '~/onedb.xml')
     req_grp('-i', '--interface', action="store", dest="interface", help="source from where NIOS data will be imported",
             choices=['wapi', 'xml'], required=True)
     req_grp('-r', action="store", dest="report", help="Defines the type of reporting that will be produced",
