@@ -468,7 +468,12 @@ def replace(self, url, id="", body=""):
     return response
 
 
-def report_versions(objyaml): ''' Rerport code and config versions ''' DBCONFIG = dblib.DBCONFIG(objyaml) RCONFIG = dblib.REPORT_CONFIG() version_report = { 'main': __version__, 'dblib': dblib.__version__, 'DB Config': DBCONFIG.version(), 'Report Config': RCONFIG.version() } return version_report
+def report_versions(objyaml):
+  ''' Report code and config versions '''
+  DBCONFIG = dblib.DBCONFIG(objyaml)
+  RCONFIG = dblib.REPORT_CONFIG()
+  version_report = { 'main': __version__, 'dblib': dblib.__version__, 'DB Config': DBCONFIG.version(), 'Report Config': RCONFIG.version() }
+  return version_report
 
 
 def process_backup(database, outfile, output_path=None, silent_mode=False, dump_obj=None, dump_all=False, list_objs=False, key_value=None, logfile='', objyaml=''):
