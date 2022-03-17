@@ -88,8 +88,7 @@ The output can be currently presented in one of the following three formats (can
             Added configuration with multiple to avoid terminal input requiring user action
 * 0.2.4     Added  inputoption XML with Grid Backup file (.bak or .tar.gz)
 * 0.3.0     Added support for Grid Backup files as input
-* 0.3.1     Added option to only gather the active leases in NIOS (ignores BloxOne)            
-            
+            Added option to only gather the active leases in NIOS (ignores BloxOne)
 # TECHNICAL REFERENCE
 
 * NIOS
@@ -107,7 +106,7 @@ The output can be currently presented in one of the following three formats (can
         ABANDONED, ACTIVE, BACKUP,DECLINED.EXPIRED,FREE,OFFERED,RELEASED,RESET,STATIC
 
 """
-__version__ = '0.3.1'
+__version__ = '0.3'
 __author__ = 'Fernando Rodriguez'
 __author_email__ = 'frodriguez@infoblox.com'
 
@@ -121,6 +120,7 @@ import bloxone
 import sys
 import ipaddress
 from ipaddress import IPv4Address, IPv4Network
+#from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from sty import fg, bg, ef, rs
 import json
 import gspread
@@ -172,7 +172,7 @@ def checks_csp_tenant(config):  # It displays the CSP tenant we´re accessing an
         sys.exit()
 
 
-def find_space_name_from_id(token_b1):  # It gets the name of the IP Spaces from the Space Id. Grid DB uses integers to
+def find_space_name_from_id( token_b1):  # It gets the name of the IP Spaces from the Space Id. Grid DB uses integers to
     # identify the network views which is not helpful (ID for 'default' = 0)
     ip_spaces = {}
     url = "https://csp.infoblox.com/api/ddi/v1//ipam/ip_space?_fields=id,name"
@@ -183,14 +183,14 @@ def find_space_name_from_id(token_b1):  # It gets the name of the IP Spaces from
     return ip_spaces
 
 
-def get_subnets(token_b1, ip_spaces):  # It will get all the networks available in CSP for this tenant
+def get_subnets( token_b1, ip_spaces):  # It will get all the networks available in CSP for this tenant
     list_subnets = {}
     url = "https://csp.infoblox.com/api/ddi/v1//ipam/subnet?_fields=address,cidr,space"
     response = requests.request("GET", url, headers= token_b1)
     subnets = response.json()['results']
     for net in subnets:
         cidr = str(net.pop('address')) + '/' + str(net.pop('cidr'))
-        net.update({'network_view': ip_spaces[net.pop('space')], 'leasesNIOS': 0, 'leasesBloxOne': 0})
+        net.update({'network_view': ip_spaces[net.pop('space')], 'leases NIOS': 0, 'leases BloxOne': 0})
         list_subnets[cidr] = net
     return list_subnets  # Output is a dictonary with the networks as indexes. This objects will be the basis for the comparson between NIOS and BloxOne DHCP leases.
     # MLeases will be assigned to their correponding subnet (within the correct ip space / network view) where every leases will increase the counters
@@ -286,17 +286,14 @@ def get_leases_grid_backup( backup_file):  # Returns nios_leases extracted from 
                 tempobject = {}
                 tempobject = {'network_view': netviews[ob['network_view']]}
                 nios_leases[ob['ip_address']] = tempobject
-        
     except (FileNotFoundError, IOError):
         print('File not found')
         sys.exit()
     return nios_leases
 
-def compares_leases_nios_bloxone( b1_leases,list_subnets,nios_leases):  ## Receives NIOS leases as input (obtained via WAPI from the GM)
-    total_leases_nios = 0
+def  compares_leases_nios_bloxone( b1_leases,list_subnets,nios_leases):  ## Receives NIOS leases as input (obtained via WAPI from the GM)
     for subnet in list_subnets:  # It also receives a list of the Subnets/Networks to use it as basis for the classification
         counter_nios = 0
-        
         counter_bloxone = 0
         for ipadd in b1_leases:
             if IPv4Address(ipadd) in IPv4Network(subnet):   #IF IP within subnet
@@ -307,8 +304,7 @@ def compares_leases_nios_bloxone( b1_leases,list_subnets,nios_leases):  ## Recei
                 if list_subnets[subnet]['network_view'] == nios_leases[lease]['network_view']:
                     counter_nios += 1       # If both conditions=TRUE, counter for that network increased ---> NIOS leases
         list_subnets[subnet].update({'leasesNIOS':  counter_nios, 'leasesBloxOne':  counter_bloxone})
-        total_leases_nios += counter_nios
-    return list_subnets, total_leases_nios
+    return list_subnets
 
 
 # noinspection PyUnresolvedReferences
@@ -322,8 +318,8 @@ def format_gsheet(wks):  ## Applies a bit of formatting to the Google Sheet docu
     return
 
 
-def  paste_csv(csvcontent, gsheet, wksname):        #When gsheet exists, this function is used to import data without
-                                                    # deleting all the existing worksheets (unlike import_csv function)
+def  paste_csv(csvcontent, gsheet, wksname):      #When gsheet exists, this function is used to import data without
+                                                # deleting all the existing worksheets (unlike import_csv function)
     global lenghtreport
     gsheet.add_worksheet(wksname, lenghtreport + 20, 30)
     wksheet = gsheet.worksheet(wksname)
@@ -332,7 +328,7 @@ def  paste_csv(csvcontent, gsheet, wksname):        #When gsheet exists, this fu
     gsheet.batch_update(body)
     return wksheet
 
-def csv_to_gsheet( gsheet_name,conf):  # Opens (if exists) or Creates (if doesn´t) a Gsheet
+def  csv_to_gsheet( gsheet_name,conf):  # Opens (if exists) or Creates (if doesn´t) a Gsheet
     myibmail = conf['ib_email']
     gc = gspread.service_account(conf['ib_service_acc'])
     timenow = time.strftime('%Y/%m/%d - %H:%M')
@@ -374,8 +370,8 @@ def print_report(report_leases, repType, filteroption, b1name, conf):
         spamwriter.writerow(['Network', 'NIOS Lease Count', 'BloxOne Lease Count', 'Comments'])
     for lease in report_leases:
         message = comment = ''
-        count_b1_leases = report_leases[lease]['leasesBloxOne']
-        count_nios_leases = report_leases[lease]['leasesNIOS']
+        count_b1_leases = report_leases[lease]['leases BloxOne']
+        count_nios_leases = report_leases[lease]['leases NIOS']
         total_nios_leases = total_nios_leases + count_nios_leases
         total_csp_leases = total_csp_leases + count_b1_leases
         print_b1_leases = 'BloxOne Lease Count :' + str( count_b1_leases)
@@ -413,7 +409,7 @@ def print_report(report_leases, repType, filteroption, b1name, conf):
         spamwriter.writerow(['Total number of leases in BloxOne :','', total_csp_leases])
         csvfile.close()
         t2 = time.perf_counter() - t1
-        print(f'Process completed. Execution time : {t2:0.2f}s ')
+        print(f' Process completed. Execution time : {t2:0.2f}s ')
         if repType == "csv":
                 print('Results have been exported to the CSV file', conf['csvfile'])
         elif repType == "gsheet":  # With log option, we don´t need to created the CSV file so this lines are not required in that case
@@ -456,6 +452,7 @@ def get_args():  ## Handles the arguments passed to the script from the command 
     opt_grp('--version', action='version', version='%(prog)s ' + __version__)
     opt_grp('--debug', action='store_true', help=argparse.SUPPRESS, dest='debug')
     opt_grp('-h', '--help', action='help', help='show this help message and exit')
+    
     return par.parse_args(args=None if sys.argv[1:] else ['-h'])
 
 
@@ -464,36 +461,32 @@ def get_args():  ## Handles the arguments passed to the script from the command 
 
 def main():
     b1_leases = {}
-    nios_leases = {}
     max_results_b1_api = 5000  # This value limits the amount of results received for an API call through BloxOne API
     max_results_wapi = 10000  # This value limits the amount of results received API call performed through NIOS WAPI
     args = get_args()
-
+    if not args.niosonly:
+        b1name = checks_csp_tenant(args.config).split(' ')[0]
     conf = read_b1_ini(args.config)
     token_b1 = {'Authorization': 'Token ' + conf['api_key']}
     ip_spaces = find_space_name_from_id( token_b1)
-    if not args.niosonly:       # When option -n is used, only NIOS leases are requested so it is not necessary to get BloxOne lease information
-        b1name = checks_csp_tenant(args.config).split(' ')[0]
+    if not args.niosonly: 
         b1_leases = get_leases_bloxone(conf['api_key'], max_results_b1_api)
     else:
         print('Option -n selected: Ignoring BloxOne leases')
-    list_subnets = get_subnets( token_b1, ip_spaces)    # List of all subnets in B1
-    if args.interface == 'wapi':                        # It will get NIOS leases from the Grid WAPI interface
+        args.filter = True
+    list_subnets = get_subnets( token_b1, ip_spaces)  # List of all subnets in B1
+    #lengthreport = len(list_subnets)
+    if args.interface == 'wapi':  # It will get NIOS leases from the Grid WAPI interface
         nios_leases =  get_leases_wapi(max_results_wapi,conf)
-    elif args.interface == 'db':                        # NIOS leases will be obtained from a Grid backup file or database file in XML format (default onedb.xml)
+    elif args.interface == 'db':  # NIOS leases will be obtained from a Grid backup file or database file in XML format (default onedb.xml)
         try:
-            xml_file = conf['dbfile']                   # Grid Backup/DB filename: .bak, .tar.gz or onedb.xml 
-            nios_leases = get_leases_grid_backup(xml_file)
+            xml_file = conf['dbfile']
+            nios_leases = get_leases_grid_backup( xml_file)
         except FileNotFoundError as e:
             print('Exception when collecting Grid Backup Leases: %s\n' % e)
     # After collecting all leases from NIOS and BloxOne, it compares both sets and creates a report with the differences
-    report_leases, total_nios_leases =  compares_leases_nios_bloxone(b1_leases, list_subnets, nios_leases)
-    
-    if args.niosonly:
-        print('Active DHCP leases in NIOS: ', total_nios_leases)
-    else:
-        print_report(report_leases, args.report, args.filter, b1name, conf)
-        
+    report_leases =  compares_leases_nios_bloxone( b1_leases, list_subnets, nios_leases)
+    print_report(report_leases, args.report, args.filter, b1name, conf)
     # It will display the results of the analysis: - directly on the terminal (log)
     #  - export to a CSV file (csv)
     #  - export to a Google Sheet (gsheet) **(requires service_account)
@@ -503,4 +496,3 @@ if __name__ == "__main__":
     # execute only if run as a script
     main()
     sys.exit()
-
