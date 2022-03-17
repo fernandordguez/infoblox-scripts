@@ -48,6 +48,8 @@ import os
 import re
 import json
 import collections
+import time
+import tarfile
 # ** Global Vars **
 __version__ = '0.7.9'
 __author__ = 'Chris Marrison'
@@ -466,46 +468,3 @@ def replace(self, url, id="", body=""):
     response = self._apipatch(url, body)
 
     return response
-
-
-def report_versions(objyaml):
-  ''' Report code and config versions '''
-  DBCONFIG = dblib.DBCONFIG(objyaml)
-  RCONFIG = dblib.REPORT_CONFIG()
-  version_report = { 'main': __version__, 'dblib': dblib.__version__, 'DB Config': DBCONFIG.version(), 'Report Config': RCONFIG.version() }
-  return version_report
-
-
-def process_backup(database, outfile, output_path=None, silent_mode=False, dump_obj=None, dump_all=False, list_objs=False, key_value=None, logfile='', objyaml=''):
-    '''
-    Determine whether backup File or XML
-    Parameters:
-        database (str): Filename
-        outfile (str): postfix for output files
-        output_path (str): Path for file output
-        silent_mode (bool): Do not log to console
-        dump_obj(str): Dump object from database
-        dump_all(bool): Dump all specified objects
-        list_objs(bool): List all object types
-        key_value(list): Key Value Pair to match using dump 
-        objyaml (str): Object config yaml file
-    '''
-    status = False
-    t = time.perf_counter()
-
-    if tarfile.is_tarfile(database):
-        # Extract db from backup
-        logging.info('EXTRACTING DATABASE FROM BACKUP')
-        with tarfile.open(database, "r:gz") as tar:
-            xmlfile = tar.extractfile('onedb.xml')
-            status = process_file(xmlfile, outfile, output_path=output_path, silent_mode=silent_mode, dump_obj=dump_obj, dump_all=dump_all, list_objs=list_objs, key_value=key_value, t=t, objyaml=objyaml)
-
-        t2 = time.perf_counter() - t
-        logging.info(f'EXTRACTED DATABASE FROM BACKUP IN {t2:0.2f}S')
-    else:
-        # Assume onedb.xml
-        logging.info('NOT BACKUP FILE ATTEMPTING TO PROCESS AS onedb.xml')
-        with open(database, 'rb') as xmlfile:
-            status = process_file(xmlfile, outfile, output_path=output_path, silent_mode=silent_mode, dump_obj=dump_obj, dump_all=dump_all, key_value=key_value, logfile=logfile, objyaml=objyaml)
-
-    return status
