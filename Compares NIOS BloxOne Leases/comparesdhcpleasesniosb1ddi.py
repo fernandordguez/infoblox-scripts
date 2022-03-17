@@ -124,11 +124,14 @@ from ipaddress import IPv4Address, IPv4Network
 from sty import fg, bg, ef, rs
 import json
 import gspread
+import logging
 from gspread_formatting import *
 import csv
 import time
-from mod import read_b1_ini
 import tarfile
+import re
+import configparser
+import os
 
 requests.packages.urllib3.disable_warnings()
 lenghtreport = 0
@@ -141,6 +144,81 @@ def validate_ip(ip):  # It is used to confirm that the leases are valid IP addre
     except ValueError:
         result = False
     return result
+
+
+def read_b1_ini(ini_filename):
+    '''
+    Open and parse ini file
+
+    Parameters:
+        ini_filename (str): name of inifile
+
+    Returns:
+        config (dict): Dictionary of BloxOne configuration elements
+
+    Raises:
+        IniFileSectionError
+        IniFileKeyError
+        APIKeyFormatError
+        FileNotFoundError
+
+    '''
+    # Local Variables
+    cfg = configparser.ConfigParser()
+    config = {}
+    ini_keys = ['url', 'api_version', 'api_key', 'ib_email', 'dbfile', 'csvfile', 'gm_ip', 'gm_usr', 'gm_pwd', 'ib_service_acc']
+
+    # Check for inifile and raise exception if not found
+    if os.path.isfile(ini_filename):
+        # Attempt to read api_key from ini file
+        try:
+            cfg.read(ini_filename)
+        except configparser.Error as err:
+            logging.error(err)
+
+        # Look for BloxOne section
+        if 'BloxOne' in cfg:
+            for key in ini_keys:
+                # Check for key in BloxOne section
+                if key in cfg['BloxOne']:
+                    config[key] = cfg['BloxOne'][key].strip("'\"")
+                    logging.debug('Key {} found in {}: {}'.format(key, ini_filename, config[key]))
+                else:
+                    logging.error('Key {} not found in BloxOne section.'.format(key))
+                    raise IniFileKeyError('Key "' + key + '" not found within [BloxOne] section of ini file {}'.format(ini_filename))
+
+        else:
+            logging.error('No BloxOne Section in config file: {}'.format(ini_filename))
+            raise IniFileSectionError('No [BloxOne] section found in ini file {}'.format(ini_filename))
+
+        # Verify format of API Key
+        if verify_api_key(config['api_key']):
+            logging.debug('API Key passed format verification')
+        else:
+            logging.debug('API Key {} failed format verification'.format(config['api_key']))
+            raise APIKeyFormatError('API Key {} failed format verification'
+                                    .format(config['api_key']))
+
+    else:
+        raise FileNotFoundError('ini file "{}" not found.'.format(ini_filename))
+
+    return config
+
+def verify_api_key(apikey):
+    '''
+    Verify format of API Key
+    Parameters: 
+    apikey (str): api key
+    
+    Returns:
+        bool: True is apikey passes format validation
+    '''
+    if re.fullmatch('[a-z0-9]{32}|[a-z0-9]{64}', apikey, re.IGNORECASE):
+        status = True
+    else:
+        status = False
+
+    return status
 
 
 def checks_csp_tenant(config):  # It displays the CSP tenant we´re accessing and will validate our API key
