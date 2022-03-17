@@ -86,7 +86,9 @@ The output can be currently presented in one of the following three formats (can
 * 0.2.2     Minor code optimizations
 * 0.2.4     Code optimizations to improve performance of some of the fucntions used to process the leases
             Added configuration with multiple to avoid terminal input requiring user action
-
+* 0.2.4     Added  inputoption XML with Grid Backup file (.bak or .tar.gz)
+* 0.3.0     Added support for Grid Backup files as input
+            Added option to only gather the active leases in NIOS (ignores BloxOne)
 # TECHNICAL REFERENCE
 
 * NIOS
@@ -104,7 +106,7 @@ The output can be currently presented in one of the following three formats (can
         ABANDONED, ACTIVE, BACKUP,DECLINED.EXPIRED,FREE,OFFERED,RELEASED,RESET,STATIC
 
 """
-__version__ = '0.2.1'
+__version__ = '0.3'
 __author__ = 'Fernando Rodriguez'
 __author_email__ = 'frodriguez@infoblox.com'
 
@@ -131,6 +133,7 @@ import time
 import collections
 import pandas as pd
 from mod import read_b1_ini,verify_api_key
+import tarfile
 
 requests.packages.urllib3.disable_warnings()
 lenghtreport = 0
@@ -257,14 +260,21 @@ def getleasesbloxone(apiKey, maxresultsb1api):
     return b1leases
 
 
-def getleasesgridbackup(xmlfile):  # Returns niosleases extracted from Grid Backup file
+def getleasesgridbackup(backupfile):  # Returns niosleases extracted from Grid Backup file
     # ['_ref', 'address', 'binding_state', 'network', 'network_view']
     listobjects = []
     netviews = {}
     niosleases = {}
+
+    if tarfile.is_tarfile(backupfile):
+        print('Extracting DB from Grid Backup')
+        tar = tarfile.open(backupfile, "r:gz")
+        xmlfile = tar.extractfile('onedb.xml')
+    else:
+        print('Not a Grid Backup file, trying onedb.xml')
+        xmlfile = open(backupfile, 'r')
     try:
-        fxmml = open(xmlfile, 'r')
-        xml_content = fxmml.read()
+        xml_content = xmlfile.read()
         objects = xmltodict.parse(xml_content)
         objects = objects['DATABASE']['OBJECT']
         for obj in objects:
@@ -308,8 +318,7 @@ def formatGsheet(wks):  ## Applies a bit of formatting to the Google Sheet docum
         "dimensions": {"sheetId": wks.id, "dimension": "COLUMNS", "startIndex": 0, "endIndex": 8}}}]}
     wks.spreadsheet.batch_update(body)
     set_frozen(wks, rows=1)
-    fmt = cellFormat(textFormat=textFormat(bold=True, foregroundColor=color(1, 1, 1)), horizontalAlignment='CENTER',
-                     backgroundColor=color(0, 0, 1))
+    fmt = cellFormat(textFormat=textFormat(bold=True, foregroundColor=color(1, 1, 1)), horizontalAlignment='CENTER', backgroundColor=color(0, 0, 1))
     format_cell_ranges(wks, [('A1:D1', fmt)])
     return
 
@@ -416,34 +425,39 @@ def printReport(reportleases, repType, filteroption, b1name, conf):
 
 def get_args():  ## Handles the arguments passed to the script from the command line
     # Parse arguments
-    usage = ' -c b1config.ini -i {"wapi", "xml"} -r {"log","csv","gsheet"} [ --delimiter {",",";"} ] [ --yaml <yaml file> ] [ --help ]'
+    usage = ' -c b1config.ini -i {"wapi", "db"} [-r {"log","csv","gsheet"}] [ --delimiter {",",";"} ] [ --yaml <yaml file> ] [ --help ] [ -f ] [ -n ]'
     description = 'This script gets DHCP leases from NIOS (via WAPI or from a Grid Backup), collects BloxOne DHCP leases from B1DDI API and compares network by network the number of leases on each platform'
     epilog = ''' sample b1config.ini 
-                [BloxOne]
-                url = 'https://csp.infoblox.com'
-                api_version = 'v1'
-                api_key = 'API_KEY'''
-    par = argparse.ArgumentParser(formatter_class=RawDescriptionHelpFormatter, description=description, add_help=False,
-                                  usage='%(prog)s' + usage, epilog=epilog)
+            [BloxOne]
+            url = 'https://csp.infoblox.com'
+            api_version = 'v1'
+            api_key = 'CSP API KEY '
+            ib_email = 'email address used to access Google Sheets user@example.com'
+            dbfile = 'path to Grid backup file or Grid DB (onedb.xml)'
+            csvfile = 'temp csv file used to generate the report'
+            gm_ip = 'IP address of the Grid Master'	
+            gm_usr = 'username'
+            gm_pwd = 'password'
+            ib_service_acc = 'JSON file with the Google Sheets service account details' '''
+    par = argparse.ArgumentParser(formatter_class=RawDescriptionHelpFormatter, description=description, add_help=False, usage='%(prog)s' + usage, epilog=epilog)
     # Required Argument(s)
     required = par.add_argument_group('Required Arguments')
     req_grp = required.add_argument
-    req_grp('-c', '--config', action="store", dest="config", help="Path to ini file with API key", required=True, default = '~/onedb.xml')
-    req_grp('-i', '--interface', action="store", dest="interface", help="source from where NIOS data will be imported",
-            choices=['wapi', 'xml'], required=True)
-    req_grp('-r', action="store", dest="report", help="Defines the type of reporting that will be produced",
-            choices=['log', 'csv', 'gsheet'], required=True, default='log')
+    req_grp('-c', '--config', action="store", dest="config", help="Path to ini file with API key", required=True)
+    req_grp('-i', '--interface', action="store", dest="interface", help="source from where NIOS data will be imported", choices=['wapi', 'db'], required=True)
     # Optional Arguments(s)
     optional = par.add_argument_group('Optional Arguments')
     opt_grp = optional.add_argument
-    opt_grp('--delimiter', action="store", dest="csvdelimiter", help="Delimiter used in CSV data file",
-            choices=[',', ';'])
+    req_grp('-r', action="store", dest="report", help="Defines the type of reporting that will be produced", choices=['log', 'csv', 'gsheet'], default='log')
+    opt_grp('-f', '--filter', action='store_true', help='Excludes networks with 0 leases from the report', dest='filter')
+    opt_grp('-n', '--niosonly', action='store_true', help='Only captures the DHCP leases from NIOS', dest='niosonly')
+    opt_grp('--delimiter', action="store", dest="csvdelimiter", help="Delimiter used in CSV data file", choices=[',', ';'])
     opt_grp('--yaml', action="store", help="Alternate yaml file for supported objects", default='objects.yaml')
+    # Informational Arguments(s)
+    opt_grp('--version', action='version', version='%(prog)s ' + __version__)
     opt_grp('--debug', action='store_true', help=argparse.SUPPRESS, dest='debug')
-    opt_grp('-f', '--filter', action='store_true', help='Excludes networks with 0 leases from the report',
-            dest='filter')
-    # opt_grp('--version', action='version', version='%(prog)s ' + __version__)
     opt_grp('-h', '--help', action='help', help='show this help message and exit')
+    
     return par.parse_args(args=None if sys.argv[1:] else ['-h'])
 
 
@@ -459,12 +473,16 @@ def main():
     conf = read_b1_ini(args.config)
     tokenb1 = {'Authorization': 'Token ' + conf['api_key']}
     ipspaces = getipspacenamesfromid(tokenb1)
-    b1leases = getleasesbloxone(conf['api_key'], maxresultsb1api)
+    if not args.niosonly: 
+        b1leases = getleasesbloxone(conf['api_key'], maxresultsb1api)
+    else:
+        print('Option -n selected: Ignoring BloxOne leases')
+        args.filter = True
     listsubnets = getSubnets(tokenb1, ipspaces)  # List of all subnets in B1
     lengthreport = len(listsubnets)
     if args.interface == 'wapi':  # It will get NIOS leases from the Grid WAPI interface
         niosleases = getleaseswapi(maxresultswapi,conf)
-    elif args.interface == 'xml':  # NIOS leases will be obtained from a Grid backup file (default onedb.xml)
+    elif args.interface == 'db':  # NIOS leases will be obtained from a Grid backup file or database file in XML format (default onedb.xml)
         try:
             xmlfile = conf['dbfile']
             niosleases = getleasesgridbackup(xmlfile)
