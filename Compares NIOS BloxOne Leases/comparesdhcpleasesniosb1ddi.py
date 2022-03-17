@@ -113,7 +113,6 @@ __author_email__ = 'frodriguez@infoblox.com'
 import bloxonedhcpleases
 from bloxonedhcpleases.rest import ApiException
 import requests
-import getpass
 import xmltodict
 import argparse
 from argparse import RawDescriptionHelpFormatter
@@ -121,18 +120,14 @@ import bloxone
 import sys
 import ipaddress
 from ipaddress import IPv4Address, IPv4Network
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
+#from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from sty import fg, bg, ef, rs
 import json
 import gspread
-import os
-import gspread_formatting
 from gspread_formatting import *
 import csv
 import time
-import collections
-import pandas as pd
-from mod import read_b1_ini,verify_api_key
+from mod import read_b1_ini
 import tarfile
 
 requests.packages.urllib3.disable_warnings()
@@ -148,7 +143,7 @@ def validate_ip(ip):  # It is used to confirm that the leases are valid IP addre
     return result
 
 
-def checkscspttenant(config):  # It displays the CSP tenant we´re accessing and will validate our API key
+def checks_csp_tenant(config):  # It displays the CSP tenant we´re accessing and will validate our API key
     """ Check Guard Rails """
 
     class BColors:
@@ -177,35 +172,35 @@ def checkscspttenant(config):  # It displays the CSP tenant we´re accessing and
         sys.exit()
 
 
-def getipspacenamesfromid(tokenb1):  # It gets the name of the IP Spaces from the Space Id. Grid DB uses integers to
+def find_space_name_from_id( token_b1):  # It gets the name of the IP Spaces from the Space Id. Grid DB uses integers to
     # identify the network views which is not helpful (ID for 'default' = 0)
-    ipspaces = {}
+    ip_spaces = {}
     url = "https://csp.infoblox.com/api/ddi/v1//ipam/ip_space?_fields=id,name"
-    response = requests.request("GET", url, headers=tokenb1)
+    response = requests.request("GET", url, headers= token_b1)
     spaces = json.loads(response.content)['results']
     for i in spaces:
-        ipspaces[i['id']] = i['name']
-    return ipspaces
+        ip_spaces[i['id']] = i['name']
+    return ip_spaces
 
 
-def getSubnets(tokenb1, ipspaces):  # It will get all the networks available in CSP for this tenant
-    listsubnets = {}
+def get_subnets( token_b1, ip_spaces):  # It will get all the networks available in CSP for this tenant
+    list_subnets = {}
     url = "https://csp.infoblox.com/api/ddi/v1//ipam/subnet?_fields=address,cidr,space"
-    response = requests.request("GET", url, headers=tokenb1)
+    response = requests.request("GET", url, headers= token_b1)
     subnets = response.json()['results']
     for net in subnets:
         cidr = str(net.pop('address')) + '/' + str(net.pop('cidr'))
-        net.update({'network_view': ipspaces[net.pop('space')], 'leasesNIOS': 0, 'leasesBloxOne': 0})
-        listsubnets[cidr] = net
-    return listsubnets  # Output is a dictonary with the networks as indexes. This objects will be the basis for the comparson between NIOS and BloxOne DHCP leases.
+        net.update({'network_view': ip_spaces[net.pop('space')], 'leases NIOS': 0, 'leases BloxOne': 0})
+        list_subnets[cidr] = net
+    return list_subnets  # Output is a dictonary with the networks as indexes. This objects will be the basis for the comparson between NIOS and BloxOne DHCP leases.
     # MLeases will be assigned to their correponding subnet (within the correct ip space / network view) where every leases will increase the counters
     # This process will be performed both for NIOS and BloxOne to get clear picture of the leases being handled by CSP after the migration from NIOS
     # Which might facilitate the detection of potential issues after the go live
 
 
-def getleaseswapi(maxresultswapi, conf):
-    niosleases = {}
-    templeases = []
+def  get_leases_wapi(max_results_wapi, conf):
+    nios_leases = {}
+    temp_leases = []
     gm_ip = conf['gm_ip']
     gm_usr = conf['gm_usr']
     gm_pwd = conf['gm_pwd']
@@ -213,107 +208,107 @@ def getleaseswapi(maxresultswapi, conf):
         print('IP address not valid, please review the configuration file')
 
     url = 'https://' + gm_ip + '/wapi/v2.10/lease?_max_results=' + str(
-        maxresultswapi) + '&_return_fields%2B=network,binding_state&_paging=1&_return_as_object=1'
+        max_results_wapi) + '&_return_fields%2B=network,binding_state&_paging=1&_return_as_object=1'
     try:
         leases = requests.request("GET", url, verify=False, auth=(gm_usr, gm_pwd)).json()
-        templeases = leases['result']
+        temp_leases = leases['result']
     except json.decoder.JSONDecodeError:
         print('API call error, review username and password and confirm WAPI IP is reachable')
-    while isinstance(leases['result'], list) and len(leases['result']) == maxresultswapi:
+    while isinstance(leases['result'], list) and len(leases['result']) == max_results_wapi:
         urlpaging = url + "&_page_id=" + str(leases['next_page_id'])
         try:
             leases = requests.request("GET", urlpaging, verify=False, auth=(gm_usr, gm_pwd)).json()
-            templeases += leases['result']
+            temp_leases += leases['result']
         except json.decoder.JSONDecodeError:
             print('API call error, review username and password and confirm WAPI IP is reachable')
             return
-    for ipadd in templeases:  # Leases with status of FREE are not considered
+    for ipadd in  temp_leases:  # Leases with status of FREE are not considered
         if ipadd['binding_state'].lower() in ['active', 'static']:
-            niosleases[ipadd['address']] = {'network_view': ipadd['network_view']}
-    return niosleases
+            nios_leases[ipadd['address']] = {'network_view': ipadd['network_view']}
+    return nios_leases
 
 
-def getleasesbloxone(apiKey, maxresultsb1api):
+def get_leases_bloxone(apiKey, max_results_b1_api):
     configuration = bloxonedhcpleases.Configuration()
     configuration.api_key_prefix['Authorization'] = 'Token'
     configuration.api_key['Authorization'] = apiKey
-    leasesApiInstance = bloxonedhcpleases.LeaseApi(bloxonedhcpleases.ApiClient(configuration))
-    tokenb1 = {'Authorization': 'Token ' + apiKey}
-    ipspaces = getipspacenamesfromid(tokenb1)
-    templeases = []
-    b1leases = {}
+    leases_api_instance = bloxonedhcpleases.LeaseApi(bloxonedhcpleases.ApiClient(configuration))
+    token_b1 = {'Authorization': 'Token ' + apiKey}
+    ip_spaces = find_space_name_from_id( token_b1)
+    temp_leases = []
+    b1_leases = {}
     offset = 0
-    listleases = leasesApiInstance.lease_list(limit=maxresultsb1api)
-    templeases += listleases.results
-    while isinstance(listleases, bloxonedhcpleases.LeasesListLeaseResponse) and (
-            len(listleases.results) == maxresultsb1api):
-        offset += maxresultsb1api + 1
+    list_leases =  leases_api_instance.lease_list(limit=max_results_b1_api)
+    temp_leases +=  list_leases.results
+    while isinstance( list_leases, bloxonedhcpleases.LeasesListLeaseResponse) and (
+            len( list_leases.results) == max_results_b1_api):
+        offset += max_results_b1_api + 1
         try:
-            listleases = leasesApiInstance.lease_list(offset=str(offset), limit=str(maxresultsb1api))
-            templeases += listleases.results
+            list_leases =  leases_api_instance.lease_list(offset=str(offset), limit=str(max_results_b1_api))
+            temp_leases +=  list_leases.results
         except ApiException as e:
             print("Exception when calling LeaseApi->lease_list: %s\n" % e)
-    for lease in templeases:
+    for lease in  temp_leases:
         if lease.state.lower() in ['issued', 'used']:   # In BloxOne Leases States are Issued, Used or Freed
                                                         # (NIOS: Active, Static)
-            b1leases.update({lease.address: {'network_view': ipspaces[lease.space]}})
-    return b1leases
+            b1_leases.update({lease.address: {'network_view': ip_spaces[lease.space]}})
+    return b1_leases
 
 
-def getleasesgridbackup(backupfile):  # Returns niosleases extracted from Grid Backup file
+def get_leases_grid_backup( backup_file):  # Returns nios_leases extracted from Grid Backup file
     # ['_ref', 'address', 'binding_state', 'network', 'network_view']
-    listobjects = []
+    list_objects = []
     netviews = {}
-    niosleases = {}
+    nios_leases = {}
 
-    if tarfile.is_tarfile(backupfile):
+    if tarfile.is_tarfile( backup_file):
         print('Extracting DB from Grid Backup')
-        tar = tarfile.open(backupfile, "r:gz")
-        xmlfile = tar.extractfile('onedb.xml')
+        tar = tarfile.open( backup_file, "r:gz")
+        xml_file = tar.extractfile('onedb.xml')
     else:
         print('Not a Grid Backup file, trying onedb.xml')
-        xmlfile = open(backupfile, 'r')
+        xml_file = open( backup_file, 'r')
     try:
-        xml_content = xmlfile.read()
+        xml_content =  xml_file.read()
         objects = xmltodict.parse(xml_content)
         objects = objects['DATABASE']['OBJECT']
         for obj in objects:
             anobject = {}
             for item in (obj['PROPERTY']):
                 anobject[item['@NAME']] = item['@VALUE']
-            listobjects.append(anobject)
-        for ob in listobjects:
+            list_objects.append(anobject)
+        for ob in  list_objects:
             if ob['__type'] == '.com.infoblox.dns.network_view':
                 netviews[ob['id']] = ob['name']
-        for ob in listobjects:
+        for ob in  list_objects:
             if (ob['__type'] == '.com.infoblox.dns.lease') and (
                     ob['binding_state'].lower() in ['active', 'static']):
                 tempobject = {}
                 tempobject = {'network_view': netviews[ob['network_view']]}
-                niosleases[ob['ip_address']] = tempobject
+                nios_leases[ob['ip_address']] = tempobject
     except (FileNotFoundError, IOError):
         print('File not found')
         sys.exit()
-    return niosleases
+    return nios_leases
 
-def comparesleasesniosbloxone(b1leases,listsubnets,niosleases):  ## Receives NIOS leases as input (obtained via WAPI from the GM)
-    for subnet in listsubnets:  # It also receives a list of the Subnets/Networks to use it as basis for the classification
-        counterNIOS = 0
-        counterBloxOne = 0
-        for ipadd in b1leases:
+def  compares_leases_nios_bloxone( b1_leases,list_subnets,nios_leases):  ## Receives NIOS leases as input (obtained via WAPI from the GM)
+    for subnet in list_subnets:  # It also receives a list of the Subnets/Networks to use it as basis for the classification
+        counter_nios = 0
+        counter_bloxone = 0
+        for ipadd in b1_leases:
             if IPv4Address(ipadd) in IPv4Network(subnet):   #IF IP within subnet
-                if listsubnets[subnet]['network_view'] == b1leases[ipadd]['network_view']:
-                    counterBloxOne += 1  # If both conditions=TRUE, counter for that network increased ---> B1 leases
-        for lease in niosleases:
+                if list_subnets[subnet]['network_view'] == b1_leases[ipadd]['network_view']:
+                    counter_bloxone += 1  # If both conditions=TRUE, counter for that network increased ---> B1 leases
+        for lease in nios_leases:
             if IPv4Address(lease) in IPv4Network(subnet):
-                if listsubnets[subnet]['network_view'] == niosleases[lease]['network_view']:
-                    counterNIOS += 1       # If both conditions=TRUE, counter for that network increased ---> NIOS leases
-        listsubnets[subnet].update({'leasesNIOS': counterNIOS, 'leasesBloxOne': counterBloxOne})
-    return listsubnets
+                if list_subnets[subnet]['network_view'] == nios_leases[lease]['network_view']:
+                    counter_nios += 1       # If both conditions=TRUE, counter for that network increased ---> NIOS leases
+        list_subnets[subnet].update({'leasesNIOS':  counter_nios, 'leasesBloxOne':  counter_bloxone})
+    return list_subnets
 
 
 # noinspection PyUnresolvedReferences
-def formatGsheet(wks):  ## Applies a bit of formatting to the Google Sheet document created
+def format_gsheet(wks):  ## Applies a bit of formatting to the Google Sheet document created
     body = {"requests": [{"autoResizeDimensions": {
         "dimensions": {"sheetId": wks.id, "dimension": "COLUMNS", "startIndex": 0, "endIndex": 8}}}]}
     wks.spreadsheet.batch_update(body)
@@ -323,7 +318,7 @@ def formatGsheet(wks):  ## Applies a bit of formatting to the Google Sheet docum
     return
 
 
-def pastecsv(csvcontent, gsheet, wksname):      #When gsheet exists, this function is used to import data without
+def  paste_csv(csvcontent, gsheet, wksname):      #When gsheet exists, this function is used to import data without
                                                 # deleting all the existing worksheets (unlike import_csv function)
     global lenghtreport
     gsheet.add_worksheet(wksname, lenghtreport + 20, 30)
@@ -333,31 +328,31 @@ def pastecsv(csvcontent, gsheet, wksname):      #When gsheet exists, this functi
     gsheet.batch_update(body)
     return wksheet
 
-def csvtogsheet(sheetname,conf):  # Opens (if exists) or Creates (if doesn´t) a Gsheet
+def  csv_to_gsheet( gsheet_name,conf):  # Opens (if exists) or Creates (if doesn´t) a Gsheet
     myibmail = conf['ib_email']
     gc = gspread.service_account(conf['ib_service_acc'])
     timenow = time.strftime('%Y/%m/%d - %H:%M')
     wksname = 'Leases ' + timenow
     with open(conf['csvfile'], 'r') as f:
-        csvContents = f.read()
+        csv_contents = f.read()
     # Email account is important, otherwise user will not be allowed to access or update the gsheet (it's created by a service account')
     try:  # Sheet exists, we just open the document. We cannot import the CSV because it will delete all other wksheets
-        sheet = gc.open(sheetname)
-        wks = pastecsv(csvContents, sheet, wksname)  # This function does not delete any existing worksheets
-        formatGsheet(wks)
+        sheet = gc.open( gsheet_name)
+        wks =  paste_csv( csv_contents, sheet, wksname)  # This function does not delete any existing worksheets
+        format_gsheet(wks)
     except gspread.exceptions.SpreadsheetNotFound:  # Sheet does not exists --> New sheet, we can just import the csv
         try:
-            sheet = gc.create(sheetname)
+            sheet = gc.create( gsheet_name)
             # Adapt as required. By default, it will share the document with the service account email (mandatory) and with
             # the email address introduced previously with read/write permission. Anyone with the link can access in R/O
             sheet.share(gc.auth.service_account_email, role='writer', perm_type='user')
             sheet.share(myibmail, role='writer', perm_type='user')
             sheet.share('', role='reader', perm_type='anyone')
-            gc.import_csv(sheet.id,csvContents)  # deletes any existing worksheets & imports the data in sh.sheet1
+            gc.import_csv(sheet.id, csv_contents)  # deletes any existing worksheets & imports the data in sh.sheet1
             sheet = gc.open_by_key(sheet.id)  # use import_csv method only with new gsheets (to keep history record)
             wks = sheet.sheet1
             wks.update_title(wksname)
-            formatGsheet(wks)
+            format_gsheet(wks)
         except gspread.exceptions.GSpreadException:
             print("error while creating the Gsheet")
     print("Gsheet available on the URL", sheet.url)  # Returns the URL to the Gsheet
@@ -365,61 +360,61 @@ def csvtogsheet(sheetname,conf):  # Opens (if exists) or Creates (if doesn´t) a
     return None
 
 
-def printReport(reportleases, repType, filteroption, b1name, conf):
+def print_report(report_leases, repType, filteroption, b1name, conf):
     # Generates the corresponding Report based on the option specified with -r [log,csv,gsheet]
-    totalniosleases = 0
-    totalcspleases = 0
+    total_nios_leases = 0
+    total_csp_leases = 0
     if repType != "log":  # With log option, we don´t need to created the CSV file so these lines will not be required in that case
         csvfile = open(conf['csvfile'], 'w', newline='')
         spamwriter = csv.writer(csvfile, delimiter=',')
         spamwriter.writerow(['Network', 'NIOS Lease Count', 'BloxOne Lease Count', 'Comments'])
-    for lease in reportleases:
+    for lease in report_leases:
         message = comment = ''
-        countb1leases = reportleases[lease]['leasesBloxOne']
-        countniosleases = reportleases[lease]['leasesNIOS']
-        totalniosleases = totalniosleases + countniosleases
-        totalcspleases = totalcspleases + countb1leases
-        printb1leases = 'BloxOne Lease Count :' + str(countb1leases)
-        warning = fg.red + printb1leases + fg.rs + comment
+        count_b1_leases = report_leases[lease]['leases BloxOne']
+        count_nios_leases = report_leases[lease]['leases NIOS']
+        total_nios_leases = total_nios_leases + count_nios_leases
+        total_csp_leases = total_csp_leases + count_b1_leases
+        print_b1_leases = 'BloxOne Lease Count :' + str( count_b1_leases)
+        warning = fg.red + print_b1_leases + fg.rs + comment
         if filteroption:    # If True, report networks with no leases are not included in the report
-            if countniosleases == 0 and countb1leases == 0:
+            if count_nios_leases == 0 and count_b1_leases == 0:
                 continue
-            elif countniosleases != 0 or countb1leases != 0:
+            elif count_nios_leases != 0 or count_b1_leases != 0:
                 # Filter from the output those networks that didn´t have any leases in NIOS
-                if (countniosleases != 0 and countb1leases == 0) or (countniosleases >= (countb1leases * 5)):
+                if ( count_nios_leases != 0 and count_b1_leases == 0) or ( count_nios_leases >= ( count_b1_leases * 5)):
                     # There were leases in NIOS but there are none in BloxOne --> Review
                     message = warning
                     comment = ' BloxOne potential issue: review number of leases'
                 else:
-                    message = printb1leases
+                    message = print_b1_leases
                     comment = ''
         elif not filteroption:           # If filteroption = False, all networks are included in the report
-            if countniosleases == 0 and countb1leases == 0:
-                message = printb1leases
+            if count_nios_leases == 0 and count_b1_leases == 0:
+                message = print_b1_leases
                 comment = ''
-            elif (countniosleases != 0 and countb1leases == 0) or (countniosleases >= (countb1leases * 5)):
+            elif ( count_nios_leases != 0 and count_b1_leases == 0) or ( count_nios_leases >= ( count_b1_leases * 5)):
                 message = warning
                 comment = ' BloxOne potential issue: review number of leases'
             else:
-                message = printb1leases
+                message = print_b1_leases
                 comment = ''
-        print('Network :', lease.ljust(18), 'NIOS Lease Count :', str(countniosleases).ljust(8), message)
+        print('Network :', lease.ljust(18), 'NIOS Lease Count :', str( count_nios_leases).ljust(8), message)
         if repType != "log":
-            spamwriter.writerow([lease, str(countniosleases), str(countb1leases),comment])
-    print('Total number of leases in NIOS :', totalniosleases)
-    print('Total number of leases in BloxOne :', totalcspleases)
+            spamwriter.writerow([lease, str( count_nios_leases), str( count_b1_leases),comment])
+    print('Total number of leases in NIOS :', total_nios_leases)
+    print('Total number of leases in BloxOne :', total_csp_leases)
     if repType != "log":
         spamwriter.writerow('')
-        spamwriter.writerow(['Total number of leases in NIOS :', totalniosleases])
-        spamwriter.writerow(['Total number of leases in BloxOne :','', totalcspleases])
+        spamwriter.writerow(['Total number of leases in NIOS :', total_nios_leases])
+        spamwriter.writerow(['Total number of leases in BloxOne :','', total_csp_leases])
         csvfile.close()
         t2 = time.perf_counter() - t1
         print(f' Process completed. Execution time : {t2:0.2f}s ')
         if repType == "csv":
                 print('Results have been exported to the CSV file', conf['csvfile'])
         elif repType == "gsheet":  # With log option, we don´t need to created the CSV file so this lines are not required in that case
-            sheetname = input('Name of the Gsheet for output [or press enter for "leases - <CUSTOMER NAME>"\n') or ('nios2b1ddi leases - ' + b1name)
-            csvtogsheet(sheetname,conf)
+            gsheet_name = input('Name of the Gsheet for output [or press enter for "leases - <CUSTOMER NAME>"\n') or ('nios2b1ddi leases - ' + b1name)
+            csv_to_gsheet( gsheet_name,conf)
     return None
 
 
@@ -465,32 +460,33 @@ def get_args():  ## Handles the arguments passed to the script from the command 
 
 
 def main():
-    b1leases = {}
-    maxresultsb1api = 5000  # This value limits the amount of results received for an API call through BloxOne API
-    maxresultswapi = 10000  # This value limits the amount of results received API call performed through NIOS WAPI
+    b1_leases = {}
+    max_results_b1_api = 5000  # This value limits the amount of results received for an API call through BloxOne API
+    max_results_wapi = 10000  # This value limits the amount of results received API call performed through NIOS WAPI
     args = get_args()
-    b1name = checkscspttenant(args.config).split(' ')[0]
+    if not args.niosonly:
+        b1name = checks_csp_tenant(args.config).split(' ')[0]
     conf = read_b1_ini(args.config)
-    tokenb1 = {'Authorization': 'Token ' + conf['api_key']}
-    ipspaces = getipspacenamesfromid(tokenb1)
+    token_b1 = {'Authorization': 'Token ' + conf['api_key']}
+    ip_spaces = find_space_name_from_id( token_b1)
     if not args.niosonly: 
-        b1leases = getleasesbloxone(conf['api_key'], maxresultsb1api)
+        b1_leases = get_leases_bloxone(conf['api_key'], max_results_b1_api)
     else:
         print('Option -n selected: Ignoring BloxOne leases')
         args.filter = True
-    listsubnets = getSubnets(tokenb1, ipspaces)  # List of all subnets in B1
-    lengthreport = len(listsubnets)
+    list_subnets = get_subnets( token_b1, ip_spaces)  # List of all subnets in B1
+    #lengthreport = len(list_subnets)
     if args.interface == 'wapi':  # It will get NIOS leases from the Grid WAPI interface
-        niosleases = getleaseswapi(maxresultswapi,conf)
+        nios_leases =  get_leases_wapi(max_results_wapi,conf)
     elif args.interface == 'db':  # NIOS leases will be obtained from a Grid backup file or database file in XML format (default onedb.xml)
         try:
-            xmlfile = conf['dbfile']
-            niosleases = getleasesgridbackup(xmlfile)
+            xml_file = conf['dbfile']
+            nios_leases = get_leases_grid_backup( xml_file)
         except FileNotFoundError as e:
             print('Exception when collecting Grid Backup Leases: %s\n' % e)
     # After collecting all leases from NIOS and BloxOne, it compares both sets and creates a report with the differences
-    reportleases = comparesleasesniosbloxone(b1leases, listsubnets, niosleases)
-    printReport(reportleases, args.report, args.filter, b1name, conf)
+    report_leases =  compares_leases_nios_bloxone( b1_leases, list_subnets, nios_leases)
+    print_report(report_leases, args.report, args.filter, b1name, conf)
     # It will display the results of the analysis: - directly on the terminal (log)
     #  - export to a CSV file (csv)
     #  - export to a Google Sheet (gsheet) **(requires service_account)
