@@ -89,7 +89,7 @@ The output can be currently presented in one of the following three formats (can
 * 0.2.4     Added  inputoption XML with Grid Backup file (.bak or .tar.gz)
 * 0.3.0     Added support for Grid Backup files as input
 * 0.3.1     Added option to only gather the active leases in NIOS (ignores BloxOne)            
-            
+* 0.3.2     Integrated functions (verify_api_key, read_b1_ini) from external custom module mod.py into the main script, mod.py has been removed from the repository               
 # TECHNICAL REFERENCE
 
 * NIOS
@@ -107,7 +107,7 @@ The output can be currently presented in one of the following three formats (can
         ABANDONED, ACTIVE, BACKUP,DECLINED.EXPIRED,FREE,OFFERED,RELEASED,RESET,STATIC
 
 """
-__version__ = '0.3.1'
+__version__ = '0.3.2'
 __author__ = 'Fernando Rodriguez'
 __author_email__ = 'frodriguez@infoblox.com'
 
@@ -136,6 +136,26 @@ import os
 requests.packages.urllib3.disable_warnings()
 lenghtreport = 0
 t1 = time.perf_counter()
+
+# Custom Exceptions
+
+class IniFileSectionError(Exception):
+    '''
+    Exception for missing section in ini file
+    '''
+    pass
+
+class IniFileKeyError(Exception):
+    '''
+    Exception for missing key in ini file
+    '''
+    pass
+
+class APIKeyFormatError(Exception):
+    '''
+    Exception for API key format mismatch
+    '''
+    pass
 
 def validate_ip(ip):  # It is used to confirm that the leases are valid IP addresses
     try:
