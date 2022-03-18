@@ -462,7 +462,7 @@ def csv_to_gsheet( gsheet_name,conf):  # Opens (if exists) or Creates (if doesnÂ
     return None
 
 
-def print_report(report_leases, repType, filteroption, b1_name, conf):
+def print_report(report_leases, repType, filteroption, b1name, conf):
     # Generates the corresponding Report based on the option specified with -r [log,csv,gsheet]
     total_nios_leases = 0
     total_csp_leases = 0
@@ -515,7 +515,7 @@ def print_report(report_leases, repType, filteroption, b1_name, conf):
         if repType == "csv":
                 print('Results have been exported to the CSV file', conf['csvfile'])
         elif repType == "gsheet":  # With log option, we donÂ´t need to created the CSV file so this lines are not required in that case
-            gsheet_name = input('Name of the Gsheet for output [or press enter for "leases - <CUSTOMER NAME>"\n') or ('nios2b1ddi leases - ' + b1_name)
+            gsheet_name = input('Name of the Gsheet for output [or press enter for "leases - <CUSTOMER NAME>"\n') or ('nios2b1ddi leases - ' + b1name)
             csv_to_gsheet( gsheet_name,conf)
     return None
 
@@ -571,7 +571,7 @@ def main():
     token_b1 = {'Authorization': 'Token ' + conf['api_key']}
     ip_spaces = find_space_name_from_id( token_b1)
     if not args.niosonly:       # When option -n is used, only NIOS leases are requested so it is not necessary to get BloxOne lease information
-        b1_name = checks_csp_tenant(args.config).split(' ')[0]
+        b1name = checks_csp_tenant(args.config).split(' ')[0]
         b1_leases = get_leases_bloxone(conf['api_key'], max_results_b1_api)
     else:
         print('Option -n selected: Ignoring BloxOne leases')
@@ -595,7 +595,7 @@ def main():
         print('Active DHCP leases in NIOS: ', total_nios_leases)
         print(f'Process completed. Execution time : {t2:0.2f}s ')
     else:
-        print_report(report_leases, args.report, args.filter, b1_name, conf)
+        print_report(report_leases, args.report, args.filter, b1name, conf)
         
     # It will display the results of the analysis: - directly on the terminal (log)
     #  - export to a CSV file (csv)
