@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# run as: python3 nios2b1ddi_compareDHCPleases -c config.ini -i wapi | onedb.xml -r log|csv|gsheet
+# run as: python3 compares_dhcp_leases_nios_b1ddi -c config.ini -i wapi | onedb.xml -r log|csv|gsheet [ -n ] [ -r ]
 # --> [ --yaml <yaml file> ] [ --help ] [ --delimiter x ]
 
 """
@@ -36,7 +36,7 @@ This script takes a NIOS
 IBCSV file and imports it into a BloxOne DDI
 instance.
 
-nios2b1ddi.py -c b1config.ini [ -i wapi | xml ] -r log|csv|gsheet] [ --delimiter x ] [ --yaml <yamlfile> ] [--help]'
+compares_dhcp_leases_nios_b1ddi.py -c b1config.ini [ -i wapi | xml ] -r log|csv|gsheet] [ --delimiter x ] [ --yaml <yamlfile> ] [--help]'
 
 # PARAMETERS
 
