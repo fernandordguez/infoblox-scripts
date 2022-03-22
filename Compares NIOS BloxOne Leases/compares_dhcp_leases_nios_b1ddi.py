@@ -51,16 +51,12 @@ The script requires the following command-line arguments.
     -r : method to be used to present the results of the script (log to terminal, csv file or Google sheet)
     -f : if present, networks without any leases will be ignored on the report (better readibility)
 
-
 # INPUT
 
 The script takes collects the required input from three sources:
 
 * NIOS:         - GRID BACKUP:      Gets the information from a Grid backup file (XXX.bak) or the NIOS DB itself (onedb.xml)
-
-
 * BloxOne:      - BloxOne API (hosted on the Infoblox Cloud Services Portal)
-
 
 # OUTPUT
 
@@ -229,7 +225,6 @@ def initialize_logger(is_debug):
     formatter = log.Formatter("%(asctime)s  %(levelname)s - %(message)s", datefmt='%Y-%m-%d:%H:%M:%S')
     handler.setFormatter(formatter)
     logger.addHandler(handler)
-
     log_file = os.path.basename(__file__)
     log_file = os.path.splitext(log_file)[0]
 
@@ -240,7 +235,6 @@ def initialize_logger(is_debug):
         handler.setLevel(log.DEBUG)
     else:
         handler.setLevel(log.INFO)
-
     formatter = log.Formatter("%(asctime)s %(levelname)s - %(message)s",datefmt='%Y-%m-%d:%H:%M:%S')
     handler.setFormatter(formatter)
     logger.addHandler(handler)
@@ -330,7 +324,7 @@ def get_leases_bloxone(apiKey, max_results_b1_api):
     temp_leases = []
     b1_leases = {}
     offset = 0
-    log.info('Connecting to BloxOne API to obtain the DHCP leases')
+    log.info('Obtaining leases from BloxOne API')
     list_leases =  leases_api_instance.lease_list(limit=max_results_b1_api)
     temp_leases +=  list_leases.results
     while isinstance(list_leases, bloxonedhcpleases.LeasesListLeaseResponse) and (
@@ -354,13 +348,14 @@ def get_leases_grid_backup( backup_file):                                   # Re
     netviews = {}
     nios_leases = {}
     if tarfile.is_tarfile( backup_file):
-        log.info('Extracting DB from Grid Backup')
+        log.info('Extracting NIOS database from Grid Backup')
         tar = tarfile.open( backup_file, "r:gz")
         xml_file = tar.extractfile('onedb.xml')
     else:
         print('Not a Grid Backup file, trying onedb.xml')
         xml_file = open( backup_file, 'r')
     try:
+        log.info('Obtaining leases from NIOS database')
         xml_content =  xml_file.read()
         objects = xmltodict.parse(xml_content)
         objects = objects['DATABASE']['OBJECT']
@@ -523,6 +518,7 @@ def get_args():                                                             # Ha
             csvfile = 'temp csv file used to generate the report'
             ib_service_acc = 'JSON file with the Google Sheets service account details' ''' # This option might not be available for most people
     par = argparse.ArgumentParser(formatter_class=RawDescriptionHelpFormatter, description=description, add_help=False, usage='%(prog)s' + usage, epilog=epilog)
+    
     # Required Argument(s)
     required = par.add_argument_group('Required Arguments')
     req_grp = required.add_argument
@@ -551,7 +547,13 @@ def main():
     conf = read_b1_ini(args.config)
     token_b1 = {'Authorization': 'Token ' + conf['api_key']}
     ip_spaces = find_space_name_from_id( token_b1)
-    
+
+    try:                                                # NIOS leases will be obtained from a Grid backup file or database file in XML format (default onedb.xml)
+        grid_bk_file = conf['dbfile']                   # Grid Backup/DB filename: .bak, .tar.gz or onedb.xml 
+        nios_leases = get_leases_grid_backup(grid_bk_file)
+    except FileNotFoundError as e:
+        log.error('Exception when collecting Grid Backup Leases: %s\n' % e)
+        
     if not args.niosonly:       # When option -n is used, only NIOS leases are requested so it is not necessary to get BloxOne lease information
         b1_name = checks_csp_tenant(args.config).split(' ')[0]
         b1_leases = get_leases_bloxone(conf['api_key'], max_results_b1_api)
@@ -560,12 +562,6 @@ def main():
         
     list_subnets = get_subnets( token_b1, ip_spaces)    # List of all subnets in B1
     lengthreport = len(list_subnets)
-
-    try:                                                # NIOS leases will be obtained from a Grid backup file or database file in XML format (default onedb.xml)
-        grid_bk_file = conf['dbfile']                   # Grid Backup/DB filename: .bak, .tar.gz or onedb.xml 
-        nios_leases = get_leases_grid_backup(grid_bk_file)
-    except FileNotFoundError as e:
-        log.error('Exception when collecting Grid Backup Leases: %s\n' % e)
 
     # After collecting all leases from NIOS and BloxOne, it compares both sets and creates a report with the differences
     report_leases, total_nios_leases =  compares_leases_nios_bloxone(b1_leases, list_subnets, nios_leases)
