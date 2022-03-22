@@ -104,7 +104,7 @@ The output can be currently presented in one of the following three formats (can
         ABANDONED, ACTIVE, BACKUP,DECLINED.EXPIRED,FREE,OFFERED,RELEASED,RESET,STATIC
 
 """
-__version__ = '0.3.3'
+__version__ = '0.4'
 __author__ = 'Fernando Rodriguez'
 __author_email__ = 'frodriguez@infoblox.com'
 
