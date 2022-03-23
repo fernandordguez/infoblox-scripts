@@ -1,10 +1,9 @@
-# TO-DO.md for nios2b1ddi_dhcpLeasesB1vsNios
+# TO-DO.md for compares_dhcp_leases_nios_b1ddi.py
 
 ### Todo
 
-- [ ] Add support for .bak files #type @Fernando 2021-09-10
 - [ ] Document the script properly
-  - [ ] Sharing in corporate sites and GH communities
+ - [ ] Sharing in corporate sites and GH communities
 
 ### In Progress
 
@@ -12,4 +11,5 @@
 
 ### Done
 
-- [x] Added Grid DB as data source (WAPI also available)
+- [X] Added Grid DB as data source (WAPI also available)
+- [X] Add support for .bak files #type @Fernando 2021-09-10
