@@ -1,5 +1,5 @@
 #!/usr/local/bin/python3
-# run as: python3 compares_dhcp_leases_nios_b1ddi.py -c config.ini [ -i wapi | db ] [ -r log|csv|gsheet ] [ -n ] [ -f ] [ --yaml <yaml file> ] [ --help ] [ --delimiter x ]
+# run as: python3 compares_dhcp_leases_nios_b1ddi.py -c config.ini -v default [ -r log|csv|gsheet ] [ -n ] [ -f ] [ --yaml <yaml file> ] [ --help ] [ --delimiter x ]
 
 """
 Copyright (C) Infoblox Inc. All rights reserved.
@@ -31,11 +31,10 @@ policies, either expressed or implied, of Infoblox.
 
 # DESCRIPTION
 
-This script takes a NIOS
-IBCSV file and imports it into a BloxOne DDI
-instance.
+This script gets the DHCP leases from NIOS Grid and compares with BloxOne leases
+within the context of a NIOS to BloxOne DDI data migration (data validation)
 
-compares_dhcp_leases_nios_b1ddi.py -c b1config.ini [ -r log|csv|gsheet] [ --delimiter x ] [ --yaml <yamlfile> ] [--help]'
+compares_dhcp_leases_nios_b1ddi.py -c b1config.ini [ -r log|csv|gsheet] [ -f ][ -n ][ --delimiter x ] [ --yaml <yamlfile> ] [--help]]'
 
 # PARAMETERS
 
@@ -43,13 +42,18 @@ The script requires the following command-line arguments.
 
     -c : path to configuration file for the bloxone python package. Here is a sample of this file:
 
-        [BloxOne]
-        url = 'https://csp.infoblox.com'
-        api_version = 'v1'
-        api_key = 'API_KEY'
+    [BloxOne]
+    url = 'https://csp.infoblox.com'
+    api_version = 'v1'
+    api_key = 'CSP API KEY '
+    ib_email = 'email address used to access Google Sheets user@example.com'
+    dbfile = 'path to onedb.xml or grid backup'
+    csvfile = 'temp csv file used to generate a CSV report with the results'
+    ib_service_acc = 'JSON file with the Google Sheets service account details '
         
     -r : method to be used to present the results of the script (log to terminal, csv file or Google sheet)
-    -f : if present, networks without any leases will be ignored on the report (better readibility)
+    -f : if present, networks with no leases will be ignored on the report (better readibility)
+    -n : if present, Only NIOS leases are captured. BloxOne leases will be ignored
 
 # INPUT
 
@@ -451,7 +455,7 @@ def csv_to_gsheet( gsheet_name,conf):                                       # Op
             except gspread.exceptions.GSpreadException:
                 log.error("error while creating the Gsheet")
         log.info(f'Gsheet available on the URL {sheet.url}')  # Returns the URL to the Gsheet
-        log.info('Filter option was enabled so output is reduced to networks with any leases \n')
+        #log.info('Filter option was enabled so output is reduced to networks with any leases \n')
     except FileNotFoundError:
         log.error("Error: JSON File not found")        
     except json.decoder.JSONDecodeError:
@@ -492,8 +496,9 @@ def print_report(report_leases, repType, filteroption, b1_name, conf, network_vi
     log.info(f'Total number of leases in BloxOne : {total_csp_leases} in BloxOne IP Space "{network_view}"')
     if repType != "log":
         spamwriter.writerow('')
-        spamwriter.writerow(['Total number of leases in NIOS :', total_nios_leases],' in NIOS Network View "',network_view,'"')
-        spamwriter.writerow(['Total number of leases in BloxOne :','', total_csp_leases],' in BloxOne IP Space "',network_view,'"')
+        spamwriter.writerow('Network View', network_view)
+        spamwriter.writerow(['Total number of leases in NIOS :', total_nios_leases])
+        spamwriter.writerow(['Total number of leases in BloxOne :','', total_csp_leases])
         csvfile.close()
         t2 = time.perf_counter() - t1
         log.info(f'Process completed. Execution time : {t2:0.2f}s ')
@@ -507,7 +512,7 @@ def print_report(report_leases, repType, filteroption, b1_name, conf, network_vi
 
 def get_args():                                                             # Handles the arguments passed to the script from the command line
     # Parse arguments
-    usage = ' -c b1config.ini [-r {"log","csv","gsheet"}] [ --delimiter {",",";"} ] [ --yaml <yaml file> ] [ --help ] [ -f ] [ -n ]'
+    usage = ' -c b1config.ini -v default [-r {"log","csv","gsheet"}] [ --delimiter {",",";"} ] [ --yaml <yaml file> ] [ --help ] [ -f ] [ -n ]'
     description = 'This script gets DHCP leases from NIOS Grid Backup or XML file, collects BloxOne DHCP leases from B1DDI API and compares network by network the number of leases on each platform'
     epilog = ''' sample b1config.ini 
             [BloxOne]
